@@ -25,7 +25,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-for command in gnome-extensions python3 unzip zip; do
+for command in python3 unzip zip; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Required packaging command not found: %s\n' "$command" >&2
         exit 1
@@ -45,26 +45,31 @@ cp "$PROJECT_DIR/LICENSE" "$STAGING_DIR/COPYING"
 find "$STAGING_DIR" -name gschemas.compiled -type f -delete
 find "$STAGING_DIR" -type f -exec touch -t 200001010000 {} +
 
-(
-    cd "$STAGING_DIR"
-    gnome-extensions pack \
-        --force \
-        --out-dir "$TEMP_DIR" \
-        .
-)
-PACKED_ARCHIVE=$(find "$TEMP_DIR" -maxdepth 1 -type f -name '*.zip' -print | head -n 1)
-if [ -z "$PACKED_ARCHIVE" ]; then
-    printf 'gnome-extensions did not create an archive.\n' >&2
-    exit 1
+PACKED_ARCHIVE="$TEMP_DIR/$UUID.shell-extension.zip"
+if command -v gnome-extensions >/dev/null 2>&1; then
+    (
+        cd "$STAGING_DIR"
+        gnome-extensions pack \
+            --force \
+            --out-dir "$TEMP_DIR" \
+            .
+        zip -X -q "$PACKED_ARCHIVE" \
+            COPYING \
+            icons/headphones-deafened-symbolic.svg \
+            icons/microphone-muted-symbolic.svg
+    )
+else
+    printf 'gnome-extensions not found; using deterministic ZIP fallback.\n'
+    (
+        cd "$STAGING_DIR"
+        zip -X -q -r "$PACKED_ARCHIVE" .
+    )
 fi
 
-(
-    cd "$STAGING_DIR"
-    zip -X -q "$PACKED_ARCHIVE" \
-        COPYING \
-        icons/headphones-deafened-symbolic.svg \
-        icons/microphone-muted-symbolic.svg
-)
+if [ ! -f "$PACKED_ARCHIVE" ]; then
+    printf 'Extension packaging did not create an archive.\n' >&2
+    exit 1
+fi
 
 ASSET_NAME="discord-voice-overlay-gnome-$RELEASE_TAG.zip"
 OUTPUT_ARCHIVE="$OUTPUT_DIR/$ASSET_NAME"

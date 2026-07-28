@@ -12,18 +12,18 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Install GNOME packaging and shell validation tools
+      - name: Install schema and shell validation tools
         run: |
           sudo apt-get update -qq
           sudo env DEBIAN_FRONTEND=noninteractive \
             apt-get install --yes --no-install-recommends \
-            gnome-shell ripgrep shellcheck
+            libglib2.0-bin ripgrep shellcheck
 
       - name: Run project checks
         run: ./scripts/check.sh
