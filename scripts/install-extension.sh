@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PROJECT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 UUID='discord-voice-overlay@rayan6ms.github.io'
 LEGACY_UUID='discord-voice-overlay@local'
 TEMP_DIR=''
