@@ -118,7 +118,7 @@ print("Default allowlist: []")
 PY
 
 if rg -n --hidden -g '!.git/**' -g '!scripts/check.sh' \
-    '/home/rayan|BEGIN [A-Z ]*PRIVATE KEY|github_pat_|gho_' \
+    '/home/[^/[:space:]]+/|BEGIN [A-Z ]*PRIVATE KEY|github_pat_|gho_' \
     "$PROJECT_DIR"; then
     printf 'Private path or credential-like text found.\n' >&2
     exit 1
