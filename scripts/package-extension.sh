@@ -43,7 +43,7 @@ STAGING_DIR="$TEMP_DIR/$UUID"
 cp -R "$SOURCE_DIR" "$STAGING_DIR"
 cp "$PROJECT_DIR/LICENSE" "$STAGING_DIR/COPYING"
 find "$STAGING_DIR" -name gschemas.compiled -type f -delete
-find "$STAGING_DIR" -type f -exec touch -t 200001010000 {} +
+find "$STAGING_DIR" -exec touch -t 200001010000 {} +
 
 PACKED_ARCHIVE="$TEMP_DIR/$UUID.shell-extension.zip"
 if command -v gnome-extensions >/dev/null 2>&1; then

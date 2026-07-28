@@ -50,7 +50,7 @@ cp "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/native.ts" "$PLUGIN_DIR/"
 cp "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/README.md" "$PLUGIN_DIR/"
 cp "$PROJECT_DIR/LICENSE" "$PLUGIN_DIR/"
 
-find "$TEMP_DIR" -type f -exec touch -t 200001010000 {} +
+find "$TEMP_DIR" -exec touch -t 200001010000 {} +
 (
     cd "$TEMP_DIR"
     zip -X -q -r "$DIST_DIR/$PLUGIN_ASSET" discordVoiceOverlay
