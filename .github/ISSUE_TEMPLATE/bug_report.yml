@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible overlay, GNOME extension, or Vencord bridge problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove private usernames, channel names, window titles, and tokens before submitting logs.
+  - type: input
+    id: gnome
+    attributes:
+      label: GNOME Shell version
+      placeholder: "50.3"
+    validations:
+      required: true
+  - type: input
+    id: distribution
+    attributes:
+      label: Linux distribution
+      placeholder: "Fedora 43"
+    validations:
+      required: true
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session type
+      options:
+        - Wayland
+        - X11
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: extension
+    attributes:
+      label: Extension metadata version
+      description: Run `gnome-extensions info discord-voice-overlay@rayan6ms.github.io`.
+      placeholder: "19"
+    validations:
+      required: true
+  - type: input
+    id: vencord
+    attributes:
+      label: Vencord version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Join a voice channel
+        2. Focus an allowed application
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: errors
+    attributes:
+      label: Relevant extension or Vencord errors
+      description: Redact private data. Include focused journal or Vencord console output.
+      render: shell
+  - type: textarea
+    id: dbus
+    attributes:
+      label: D-Bus application-list result
+      description: Run the ListOpenApplications `gdbus` command from the README and paste its redacted result.
+      render: shell
+    validations:
+      required: true

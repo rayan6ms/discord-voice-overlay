@@ -1,0 +1,38 @@
+# GNOME generated output
+**/schemas/gschemas.compiled
+*.shell-extension.zip
+
+# Dependency and build output
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+
+# Archives, checksums, backups, and logs
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+SHA256SUMS
+*.backup
+*.bak
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+
+# Credentials and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key

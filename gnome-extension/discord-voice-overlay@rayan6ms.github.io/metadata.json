@@ -1,0 +1,11 @@
+{
+    "uuid": "discord-voice-overlay@rayan6ms.github.io",
+    "name": "Discord Voice Overlay",
+    "description": "Transparent Discord voice activity overlay for applications selected from Preferences. Includes speaking indicators, stream status, multi-monitor positioning and compact large-call handling.",
+    "url": "https://github.com/rayan6ms/discord-voice-overlay",
+    "shell-version": [
+        "50"
+    ],
+    "settings-schema": "org.gnome.shell.extensions.discord-voice-overlay",
+    "version": 19
+}

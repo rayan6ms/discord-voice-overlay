@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="16"
+     height="16"
+     viewBox="0 0 16 16"
+     fill="none"
+     stroke="#ffffff"
+     stroke-width="1.5"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+  <rect x="5.25" y="1.75" width="5.5" height="8.25" rx="2.75"/>
+  <path d="M3.75 7.25v0.5A4.25 4.25 0 0 0 8 12"/>
+  <path d="M8 12v2.25"/>
+  <path d="M5.75 14.25h4.5"/>
+  <path d="M2.25 2.25l11.5 11.5"/>
+</svg>

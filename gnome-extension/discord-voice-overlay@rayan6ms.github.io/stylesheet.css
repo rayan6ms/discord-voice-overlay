@@ -1,0 +1,168 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+.dvo-root {
+    spacing: 5px;
+}
+
+.dvo-toolbar {
+    spacing: 5px;
+    padding: 6px;
+    min-width: 196px;
+    border-radius: 9px;
+    background-color: rgba(20, 20, 24, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.dvo-drag-handle {
+    padding: 5px 8px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.dvo-drag-handle:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.dvo-overlay-drag-handle {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.48);
+}
+
+.dvo-drag-label {
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.dvo-control-button {
+    padding: 5px 8px;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.dvo-control-button:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.dvo-control-on {
+    background-color: rgba(35, 165, 90, 0.40);
+}
+
+.dvo-size-control {
+    spacing: 3px;
+    padding: 0 3px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dvo-size-button {
+    min-width: 18px;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.dvo-size-label {
+    min-width: 72px;
+    color: rgba(255, 255, 255, 0.90);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.dvo-user-list {
+    spacing: 4px;
+}
+
+.dvo-user-row {
+    spacing: 6px;
+}
+
+
+.dvo-avatar-stack {
+    border-radius: 999px;
+}
+
+.dvo-avatar-ring-inside {
+    border: 2px solid #23a55a;
+    border-radius: 999px;
+}
+
+.dvo-avatar-frame {
+    padding: 1px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+}
+
+.dvo-avatar-frame-speaking {
+    border-color: #23a55a;
+}
+
+.dvo-avatar-image {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.10);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.dvo-avatar-fallback {
+    color: rgba(255, 255, 255, 0.86);
+}
+
+.dvo-name-plate {
+    spacing: 4px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background-color: rgba(18, 18, 20, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.dvo-name {
+    color: rgba(255, 255, 255, 0.96);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.dvo-live-badge {
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: rgba(255, 255, 255, 0.98);
+    background-color: #ed4245;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.dvo-status-icon {
+    color: rgba(255, 255, 255, 0.90);
+}
+
+.dvo-status-muted,
+.dvo-status-deafened {
+    icon-size: 12px;
+}
+
+.dvo-placeholder {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12px;
+    font-style: italic;
+    padding: 4px 6px;
+}
+
+
+.dvo-overflow {
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.78);
+    background-color: rgba(18, 18, 20, 0.62);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.dvo-overflow-right {
+    text-align: right;
+}

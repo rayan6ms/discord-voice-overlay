@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<schemalist>
+  <schema
+      id="org.gnome.shell.extensions.discord-voice-overlay"
+      path="/org/gnome/shell/extensions/discord-voice-overlay/">
+
+    <key name="toggle-edit-mode" type="as">
+      <default>['&lt;Control&gt;comma']</default>
+      <summary>Toggle overlay edit mode</summary>
+    </key>
+
+    <key name="overlay-enabled" type="b">
+      <default>true</default>
+      <summary>Whether voice users are displayed</summary>
+    </key>
+
+    <key name="speaking-only" type="b">
+      <default>false</default>
+      <summary>Only display users who are currently speaking</summary>
+    </key>
+
+    <key name="ring-inside" type="b">
+      <default>false</default>
+      <summary>Draw the speaking ring inside the avatar</summary>
+    </key>
+
+    <key name="name-max-width" type="i">
+      <range min="80" max="320"/>
+      <default>180</default>
+      <summary>Maximum displayed username width</summary>
+    </key>
+
+    <key name="max-visible-users" type="i">
+      <range min="1" max="30"/>
+      <default>8</default>
+      <summary>Maximum number of voice users displayed</summary>
+    </key>
+
+    <key name="avatar-size" type="i">
+      <range min="20" max="64"/>
+      <default>28</default>
+      <summary>Avatar diameter in pixels</summary>
+    </key>
+
+    <key name="position-global" type="b">
+      <default>false</default>
+      <summary>Whether overlay coordinates use the global desktop</summary>
+    </key>
+
+    <key name="anchor-right" type="b">
+      <default>false</default>
+      <summary>Anchor the overlay to its right edge</summary>
+    </key>
+
+    <key name="palette-position-x" type="i">
+      <default>64</default>
+      <summary>Controls palette global X position</summary>
+    </key>
+
+    <key name="palette-position-y" type="i">
+      <default>96</default>
+      <summary>Controls palette global Y position</summary>
+    </key>
+
+    <key name="palette-position-set" type="b">
+      <default>false</default>
+      <summary>Whether the controls palette has a saved position</summary>
+    </key>
+
+    <key name="position-x" type="i">
+      <default>24</default>
+      <summary>Overlay X position</summary>
+    </key>
+
+    <key name="position-y" type="i">
+      <default>72</default>
+      <summary>Overlay Y position</summary>
+    </key>
+
+    <key name="allowed-wm-classes" type="as">
+      <default>[]</default>
+      <summary>Window identifiers allowed to show the overlay</summary>
+    </key>
+
+  </schema>
+</schemalist>
