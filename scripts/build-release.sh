@@ -5,7 +5,8 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 DIST_DIR="$PROJECT_DIR/dist"
-RELEASE_TAG=${1:-v1.0.1}
+PROJECT_VERSION=$(sed -n '1p' "$PROJECT_DIR/VERSION")
+RELEASE_TAG=${1:-"v$PROJECT_VERSION"}
 PLUGIN_ASSET="discord-voice-overlay-vencord-plugin-$RELEASE_TAG.zip"
 INSTALL_ASSET='install.sh'
 TEMP_DIR=''
@@ -17,6 +18,12 @@ case "$RELEASE_TAG" in
         exit 2
         ;;
 esac
+
+if [ "$RELEASE_TAG" != "v$PROJECT_VERSION" ]; then
+    printf 'Release tag %s does not match VERSION (%s).\n' \
+        "$RELEASE_TAG" "$PROJECT_VERSION" >&2
+    exit 2
+fi
 
 cleanup() {
     if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
