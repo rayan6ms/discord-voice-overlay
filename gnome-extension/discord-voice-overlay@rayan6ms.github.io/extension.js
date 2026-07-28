@@ -11,6 +11,8 @@ import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {parseState} from './state.js';
+
 
 const AVATAR_SIZE_MIN = 20;
 const AVATAR_SIZE_MAX = 64;
@@ -28,9 +30,9 @@ const OVERLAY_MARGIN = 8;
 const PALETTE_GAP = 12;
 const OVERLAY_HANDLE_GAP = 4;
 
-const POLL_INTERVAL_MS = 25;
+const POLL_INTERVAL_MS = 100;
 const KEYBINDING_NAME = 'toggle-edit-mode';
-const EXTENSION_VERSION = 19;
+const EXTENSION_VERSION = 20;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -73,54 +75,6 @@ function runtimeStatePath() {
 function clearChildren(actor) {
     for (const child of actor.get_children())
         child.destroy();
-}
-
-
-function emptyState() {
-    return {
-        connected: false,
-        channel: null,
-        users: [],
-    };
-}
-
-
-function parseState(raw) {
-    if (!raw)
-        return emptyState();
-
-    try {
-        const parsed = JSON.parse(raw);
-
-        if (
-            !parsed
-            || typeof parsed !== 'object'
-            || Array.isArray(parsed)
-        ) {
-            return emptyState();
-        }
-
-        return {
-            connected: Boolean(parsed.connected),
-            channel:
-                parsed.channel
-                && typeof parsed.channel === 'object'
-                && !Array.isArray(parsed.channel)
-                    ? parsed.channel
-                    : null,
-            users:
-                Array.isArray(parsed.users)
-                    ? parsed.users.filter(
-                        user =>
-                            user
-                            && typeof user === 'object'
-                            && !Array.isArray(user)
-                    )
-                    : [],
-        };
-    } catch {
-        return emptyState();
-    }
 }
 
 
@@ -2698,6 +2652,7 @@ export default class DiscordVoiceOverlay extends Extension {
         const renderKey =
             JSON.stringify({
                 raw,
+                connected: state.connected,
                 overlayEnabled,
                 speakingOnly,
                 ringInside,
@@ -2781,21 +2736,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
 
 
-        /*
-         * Preserve each group's stable order while ensuring active
-         * speakers are not hidden behind silent users in large calls.
-         */
-        const prioritisedUsers = [
-            ...users.filter(
-                user => Boolean(user.speaking)
-            ),
-
-            ...users.filter(
-                user => !Boolean(user.speaking)
-            ),
-        ];
-
-
         const monitor =
             this._monitorForActor(this._root)
             ?? this._focusedMonitor();
@@ -2830,11 +2770,11 @@ export default class DiscordVoiceOverlay extends Extension {
             Math.min(
                 maxVisibleUsers,
                 rowsByHeight,
-                prioritisedUsers.length
+                users.length
             );
 
         const overflowNeeded =
-            prioritisedUsers.length
+            users.length
             > preliminaryLimit;
 
         const visibleLimit =
@@ -2849,7 +2789,7 @@ export default class DiscordVoiceOverlay extends Extension {
                 : preliminaryLimit;
 
         const visibleUsers =
-            prioritisedUsers.slice(
+            users.slice(
                 0,
                 visibleLimit
             );
@@ -2857,7 +2797,7 @@ export default class DiscordVoiceOverlay extends Extension {
         const hiddenCount =
             Math.max(
                 0,
-                prioritisedUsers.length
+                users.length
                 - visibleUsers.length
             );
 

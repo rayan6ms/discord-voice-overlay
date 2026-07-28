@@ -2,6 +2,27 @@
 
 All notable public changes are documented here.
 
+## [1.0.1] - 2026-07-28
+
+GNOME extension metadata version: 20.
+
+### Added
+
+- One-command release installer that downloads and verifies the packages, prepares the required Vencord source build, and installs the GNOME extension last.
+- Low-frequency bridge heartbeat and a tested 45-second freshness timeout so an unclean Discord exit cannot leave the overlay visible indefinitely.
+- Screenshots of the overlay, edit controls, and application picker.
+
+### Fixed
+
+- Preserve stable voice-member ordering instead of moving active speakers to the front while speaking-only mode is off.
+
+### Changed
+
+- Reworked the README around a short end-user installation and setup path.
+- Reduced extension state polling from 40 to 10 reads per second.
+- Consolidated security reporting into the README and GitHub's private advisory link.
+- Removed the repository copy of v1.0.0 release notes; GitHub Releases remains the canonical home for per-release notes.
+
 ## [1.0.0] - 2026-07-28
 
 Initial public release. GNOME extension metadata version: 19.
@@ -38,3 +59,4 @@ Initial public release. GNOME extension metadata version: 19.
 - Fullscreen composition behavior can still depend on the application and graphics stack.
 
 [1.0.0]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.0
+[1.0.1]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.1

@@ -223,7 +223,7 @@ export default class DiscordVoiceOverlayPreferences
         const maxUsersRow = new Adw.SpinRow({
             title: _('Maximum visible users'),
             subtitle:
-                _('Additional users are represented by a compact “+N more” row. Active speakers are prioritised.'),
+                _('Additional users are represented by a compact “+N more” row. People keep a stable order while they are in the channel.'),
             adjustment: maxUsersAdjustment,
             digits: 0,
         });

@@ -2,6 +2,8 @@
 
 This folder is the local bridge required by [Discord Voice Overlay for GNOME](https://github.com/rayan6ms/discord-voice-overlay).
 
+The project's release installer handles this folder automatically. These manual instructions stay with the downloadable plugin package so it remains self-describing.
+
 Custom Vencord plugins cannot be imported through the Plugins UI. Place this whole `discordVoiceOverlay` folder at:
 
 ```text

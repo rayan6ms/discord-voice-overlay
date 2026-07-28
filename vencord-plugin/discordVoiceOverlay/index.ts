@@ -18,6 +18,9 @@ import {
 
 const Native = VencordNative.pluginHelpers.DiscordVoiceOverlay as PluginNative<typeof import("./native")>;
 
+const STATE_PROTOCOL_VERSION = 2 as const;
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
 
 /*
  * SpeakingStore is not exported by @webpack/common, so retrieve
@@ -42,7 +45,9 @@ interface OverlayUser {
 
 
 interface OverlayState {
-    version: 1;
+    version: typeof STATE_PROTOCOL_VERSION;
+
+    publishedAt: number;
 
     connected: boolean;
 
@@ -57,7 +62,8 @@ interface OverlayState {
 
 
 let timer: number | undefined;
-let lastJson = "";
+let lastStateJson = "";
+let lastPublishedAt = 0;
 let running = false;
 let publishQueue = Promise.resolve();
 
@@ -194,12 +200,12 @@ function isLive(
 }
 
 
-function buildState(): OverlayState {
+function buildState(): Omit<OverlayState, "publishedAt"> {
     const channelId = getVoiceChannelId();
 
     if (!channelId) {
         return {
-            version: 1,
+            version: STATE_PROTOCOL_VERSION,
             connected: false,
             channel: null,
             users: []
@@ -210,7 +216,7 @@ function buildState(): OverlayState {
 
     if (!channel) {
         return {
-            version: 1,
+            version: STATE_PROTOCOL_VERSION,
             connected: false,
             channel: null,
             users: []
@@ -291,7 +297,7 @@ function buildState(): OverlayState {
     });
 
     return {
-        version: 1,
+        version: STATE_PROTOCOL_VERSION,
         connected: true,
 
         channel: {
@@ -309,19 +315,37 @@ async function publishState(force = false) {
     try {
         const state = buildState();
 
-        const json =
-            JSON.stringify(state, null, 2)
-            + "\n";
+        const stateJson =
+            JSON.stringify(state);
+
+        const now = Date.now();
 
         /*
-         * Don't touch the filesystem 5 times per second unless
-         * something actually changed.
+         * Republish unchanged state occasionally so GNOME can detect
+         * an unclean Discord exit without returning to frequent writes.
          */
-        if (!force && json === lastJson)
+        if (
+            !force
+            && stateJson === lastStateJson
+            && now - lastPublishedAt < HEARTBEAT_INTERVAL_MS
+        ) {
             return;
+        }
+
+        const json =
+            JSON.stringify(
+                {
+                    ...state,
+                    publishedAt: now
+                },
+                null,
+                2
+            )
+            + "\n";
 
         await Native.writeState(json);
-        lastJson = json;
+        lastStateJson = stateJson;
+        lastPublishedAt = now;
     } catch (error) {
         console.error(
             "[DiscordVoiceOverlay] Failed to publish state:",
@@ -361,7 +385,8 @@ export default definePlugin({
             window.clearInterval(timer);
 
         running = true;
-        lastJson = "";
+        lastStateJson = "";
+        lastPublishedAt = 0;
         publishQueue = Promise.resolve();
 
         /*
@@ -386,7 +411,8 @@ export default definePlugin({
             timer = undefined;
         }
 
-        lastJson = "";
+        lastStateJson = "";
+        lastPublishedAt = 0;
 
         publishQueue = publishQueue
             .catch(() => undefined)

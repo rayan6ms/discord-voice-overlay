@@ -22,6 +22,8 @@ require_command rg
 
 node --check "$EXTENSION_DIR/extension.js"
 node --check "$EXTENSION_DIR/prefs.js"
+node --check "$EXTENSION_DIR/state.js"
+node "$SCRIPT_DIR/test-state.mjs"
 python3 -m json.tool "$METADATA" >/dev/null
 
 if command -v glib-compile-schemas >/dev/null 2>&1; then
@@ -39,19 +41,31 @@ for script in "$SCRIPT_DIR"/*.sh; do
 done
 
 python3 - "$METADATA" "$EXTENSION_DIR/extension.js" \
-    "$EXTENSION_DIR/prefs.js" "$SCHEMA" "$EXTENSION_DIR" <<'PY'
+    "$EXTENSION_DIR/prefs.js" "$SCHEMA" "$EXTENSION_DIR" \
+    "$EXTENSION_DIR/state.js" \
+    "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/index.ts" <<'PY'
 import json
 from pathlib import Path
 import re
 import sys
 import xml.etree.ElementTree as ET
 
-metadata_path, extension_path, prefs_path, schema_path, extension_dir = (
+(
+    metadata_path,
+    extension_path,
+    prefs_path,
+    schema_path,
+    extension_dir,
+    state_path,
+    plugin_path,
+) = (
     map(Path, sys.argv[1:])
 )
 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 extension = extension_path.read_text(encoding="utf-8")
 prefs = prefs_path.read_text(encoding="utf-8")
+state_module = state_path.read_text(encoding="utf-8")
+plugin = plugin_path.read_text(encoding="utf-8")
 root = ET.parse(schema_path).getroot()
 
 required = {
@@ -94,6 +108,21 @@ if not extension_protocol or not prefs_protocol:
 if extension_protocol.group(1) != prefs_protocol.group(1):
     raise SystemExit("application-picker protocol mismatch")
 
+state_protocol = re.search(
+    r"export const STATE_PROTOCOL_VERSION = (\d+);",
+    state_module,
+)
+plugin_state_protocol = re.search(
+    r"const STATE_PROTOCOL_VERSION = (\d+) as const;",
+    plugin,
+)
+
+if not state_protocol or not plugin_state_protocol:
+    raise SystemExit("state protocol constant is missing")
+
+if state_protocol.group(1) != plugin_state_protocol.group(1):
+    raise SystemExit("GNOME and Vencord state protocol versions do not match")
+
 allowed_key = next(
     (
         key
@@ -114,6 +143,7 @@ if compiled:
     raise SystemExit("gschemas.compiled must not be stored in source")
 
 print(f"Metadata/runtime version: {version}")
+print(f"State protocol version: {state_protocol.group(1)}")
 print("Default allowlist: []")
 PY
 
