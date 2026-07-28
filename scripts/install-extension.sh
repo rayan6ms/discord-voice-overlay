@@ -32,8 +32,8 @@ if [ "$#" -eq 1 ]; then
     ARCHIVE=$1
 else
     TEMP_DIR=$(mktemp -d)
-    "$SCRIPT_DIR/package-extension.sh" "$TEMP_DIR" v1.0.0
-    ARCHIVE="$TEMP_DIR/discord-voice-overlay-gnome-v1.0.0.zip"
+    "$SCRIPT_DIR/package-extension.sh" "$TEMP_DIR" v1.0.1
+    ARCHIVE="$TEMP_DIR/discord-voice-overlay-gnome-v1.0.1.zip"
 fi
 
 if [ ! -f "$ARCHIVE" ]; then

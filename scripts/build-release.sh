@@ -5,8 +5,9 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 DIST_DIR="$PROJECT_DIR/dist"
-RELEASE_TAG=${1:-v1.0.0}
+RELEASE_TAG=${1:-v1.0.1}
 PLUGIN_ASSET="discord-voice-overlay-vencord-plugin-$RELEASE_TAG.zip"
+INSTALL_ASSET='install.sh'
 TEMP_DIR=''
 
 case "$RELEASE_TAG" in
@@ -56,11 +57,18 @@ find "$TEMP_DIR" -exec touch -t 200001010000 {} +
     zip -X -q -r "$DIST_DIR/$PLUGIN_ASSET" discordVoiceOverlay
 )
 
+sed "s/@RELEASE_TAG@/$RELEASE_TAG/g" \
+    "$SCRIPT_DIR/install-release.sh" \
+    > "$DIST_DIR/$INSTALL_ASSET"
+chmod 0755 "$DIST_DIR/$INSTALL_ASSET"
+touch -t 200001010000 "$DIST_DIR/$INSTALL_ASSET"
+
 (
     cd "$DIST_DIR"
     sha256sum \
         "discord-voice-overlay-gnome-$RELEASE_TAG.zip" \
-        "$PLUGIN_ASSET" > SHA256SUMS
+        "$PLUGIN_ASSET" \
+        "$INSTALL_ASSET" > SHA256SUMS
     sha256sum -c SHA256SUMS
 )
 
