@@ -17,20 +17,21 @@ The Git, Node.js, and pnpm requirements come from [Vencord's custom-plugin syste
 
 [Vencord](https://vencord.dev/) is a third-party Discord client modification. Client modifications are against Discord's Terms of Service, so decide whether that trade-off is acceptable before installing.
 
-## Install
+## Install or update
 
 Close Discord, then run:
 
 ```sh
-sh -c "$(curl -fsSL https://github.com/rayan6ms/discord-voice-overlay/releases/download/v1.0.1/install.sh)"
+sh -c "$(curl -fsSL https://github.com/rayan6ms/discord-voice-overlay/releases/latest/download/install.sh)"
 ```
 
-The script:
+Use this same command for the first installation and every future update. The `latest` URL always selects the current stable release. The script:
 
-1. Downloads and verifies the v1.0.1 release packages.
+1. Downloads and verifies the latest release packages.
 2. Downloads or updates the Vencord source needed for custom plugins.
-3. Adds DiscordVoiceOverlay, builds Vencord, and opens Vencord's installer.
-4. Installs the GNOME extension last, so the required logout is your final installation step.
+3. Safely replaces the existing bridge, builds Vencord, and opens Vencord's installer.
+4. Installs or replaces the GNOME extension last.
+5. Disables and backs up the old prerelease `discord-voice-overlay@local` extension when present.
 
 When Vencord's installer opens, choose your Discord installation and select **Install**. Then:
 
@@ -56,7 +57,7 @@ The installer uses `$HOME/.local/src/Vencord` by default. If your source checkou
 
 ```sh
 VENCORD_DIR="/path/to/Vencord" \
-    sh -c "$(curl -fsSL https://github.com/rayan6ms/discord-voice-overlay/releases/download/v1.0.1/install.sh)"
+    sh -c "$(curl -fsSL https://github.com/rayan6ms/discord-voice-overlay/releases/latest/download/install.sh)"
 ```
 
 ### Manual installation
@@ -64,13 +65,13 @@ VENCORD_DIR="/path/to/Vencord" \
 If you prefer to inspect and run every step yourself:
 
 1. Follow Vencord's official [source installation](https://docs.vencord.dev/installing/) guide.
-2. Download `discord-voice-overlay-vencord-plugin-v1.0.1.zip` from the [v1.0.1 release](https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.1).
+2. Download `discord-voice-overlay-vencord-plugin-v1.0.2.zip` from the [latest release](https://github.com/rayan6ms/discord-voice-overlay/releases/latest).
 3. Extract its `discordVoiceOverlay` folder into `Vencord/src/userplugins/`.
 4. Run `pnpm build` and `pnpm inject` inside the Vencord checkout, then restart Discord and enable **DiscordVoiceOverlay**.
-5. Download `discord-voice-overlay-gnome-v1.0.1.zip` from the same release and install it last:
+5. Download `discord-voice-overlay-gnome-v1.0.2.zip` from the same release and install it last:
 
 ```sh
-gnome-extensions install --force ./discord-voice-overlay-gnome-v1.0.1.zip
+gnome-extensions install --force ./discord-voice-overlay-gnome-v1.0.2.zip
 ```
 
 Log out and back in, enable the extension, and select your applications as described above.
@@ -92,7 +93,7 @@ You can change or disable the shortcut in extension preferences.
 
 ## Update
 
-Run the installer command for the new release. It backs up only the existing `discordVoiceOverlay` plugin folder, rebuilds Vencord, and replaces the GNOME extension. Restart Discord and log out/in to load the new code.
+Rerun the command from **Install or update**. It backs up only the existing `discordVoiceOverlay` plugin folder, rebuilds Vencord, and replaces the GNOME extension. Restart Discord and log out/in to load the new code.
 
 ## Troubleshooting
 

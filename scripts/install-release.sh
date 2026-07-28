@@ -5,6 +5,7 @@ set -eu
 RELEASE_TAG=${DVO_VERSION:-@RELEASE_TAG@}
 REPOSITORY='rayan6ms/discord-voice-overlay'
 UUID='discord-voice-overlay@rayan6ms.github.io'
+LEGACY_UUID='discord-voice-overlay@local'
 VENCORD_PATH=${VENCORD_DIR:-"$HOME/.local/src/Vencord"}
 TEMP_DIR=''
 INSTALL_STAGE=''
@@ -39,13 +40,25 @@ for command in curl git gnome-extensions node pnpm sha256sum unzip; do
     fi
 done
 
+DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
+EXTENSION_DIR="$DATA_HOME/gnome-shell/extensions/$UUID"
+LEGACY_DIR="$DATA_HOME/gnome-shell/extensions/$LEGACY_UUID"
+
+if [ -f "$EXTENSION_DIR/metadata.json" ]; then
+    ACTION='Updating'
+    COMPLETION='Update'
+else
+    ACTION='Installing'
+    COMPLETION='Installation'
+fi
+
 BASE_URL="https://github.com/$REPOSITORY/releases/download/$RELEASE_TAG"
 GNOME_ASSET="discord-voice-overlay-gnome-$RELEASE_TAG.zip"
 PLUGIN_ASSET="discord-voice-overlay-vencord-plugin-$RELEASE_TAG.zip"
 
 TEMP_DIR=$(mktemp -d)
 
-printf 'Downloading Discord Voice Overlay %s…\n' "$RELEASE_TAG"
+printf '%s Discord Voice Overlay to %s…\n' "$ACTION" "$RELEASE_TAG"
 curl -fL --retry 3 -o "$TEMP_DIR/$GNOME_ASSET" \
     "$BASE_URL/$GNOME_ASSET"
 curl -fL --retry 3 -o "$TEMP_DIR/$PLUGIN_ASSET" \
@@ -99,7 +112,6 @@ INSTALL_STAGE=$(mktemp -d "$USER_PLUGINS/.discordVoiceOverlay.installing.XXXXXX"
 cp -R "$PLUGIN_SOURCE/." "$INSTALL_STAGE/"
 
 if [ -e "$TARGET_DIR" ]; then
-    DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
     BACKUP_ROOT="$DATA_HOME/discord-voice-overlay/vencord-plugin-backups"
     mkdir -p "$BACKUP_ROOT"
     TIMESTAMP=$(date -u '+%Y%m%dT%H%M%SZ')
@@ -118,7 +130,6 @@ printf 'Building Vencord with DiscordVoiceOverlay…\n'
     pnpm inject
 )
 
-DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
 mkdir -p "$DATA_HOME/gnome-shell"
 INSTALL_CACHE=$(mktemp -d "$DATA_HOME/gnome-shell/.dvo-install-cache.XXXXXX")
 
@@ -126,10 +137,27 @@ printf 'Installing the GNOME extension last…\n'
 XDG_CACHE_HOME="$INSTALL_CACHE" \
     gnome-extensions install --force "$TEMP_DIR/$GNOME_ASSET"
 
-printf '\nInstallation complete.\n'
+if [ -d "$LEGACY_DIR" ]; then
+    if gnome-extensions info "$LEGACY_UUID" >/dev/null 2>&1; then
+        if ! gnome-extensions disable "$LEGACY_UUID"; then
+            printf 'Warning: could not disable legacy extension %s.\n' \
+                "$LEGACY_UUID" >&2
+        fi
+    fi
+
+    LEGACY_BACKUP_ROOT="$DATA_HOME/discord-voice-overlay/legacy-extension-backups"
+    mkdir -p "$LEGACY_BACKUP_ROOT"
+    TIMESTAMP=$(date -u '+%Y%m%dT%H%M%SZ')
+    LEGACY_BACKUP="$LEGACY_BACKUP_ROOT/$LEGACY_UUID-$TIMESTAMP-$$"
+    mv "$LEGACY_DIR" "$LEGACY_BACKUP"
+    printf 'Moved the legacy extension to %s\n' "$LEGACY_BACKUP"
+fi
+
+printf '\n%s complete.\n' "$COMPLETION"
 printf '1. Fully restart Discord, enable DiscordVoiceOverlay in Vencord Plugins,\n'
 printf '   and restart Discord again if prompted.\n'
 printf '2. Log out of GNOME and log back in.\n'
 printf '3. Enable and configure the extension:\n'
 printf '   gnome-extensions enable %s\n' "$UUID"
 printf '   gnome-extensions prefs %s\n' "$UUID"
+printf '\nRerun the same releases/latest install command to update in the future.\n'

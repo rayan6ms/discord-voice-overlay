@@ -46,5 +46,5 @@ dbus-run-session gnome-shell --devkit --wayland
 Build all release assets:
 
 ```sh
-./scripts/build-release.sh v1.0.1
+./scripts/build-release.sh
 ```

@@ -29,12 +29,13 @@ jobs:
         run: ./scripts/check.sh
 
       - name: Build and verify release assets
-        run: ./scripts/build-release.sh v1.0.1
+        run: ./scripts/build-release.sh
 
       - name: Inspect archive contents
         run: |
-          unzip -Z1 dist/discord-voice-overlay-gnome-v1.0.1.zip
-          unzip -Z1 dist/discord-voice-overlay-vencord-plugin-v1.0.1.zip
+          release_tag="v$(cat VERSION)"
+          unzip -Z1 "dist/discord-voice-overlay-gnome-$release_tag.zip"
+          unzip -Z1 "dist/discord-voice-overlay-vencord-plugin-$release_tag.zip"
           sh -n dist/install.sh
-          grep -F 'RELEASE_TAG=${DVO_VERSION:-v1.0.1}' dist/install.sh
+          grep -F "RELEASE_TAG=\${DVO_VERSION:-$release_tag}" dist/install.sh
           (cd dist && sha256sum -c SHA256SUMS)

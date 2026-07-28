@@ -11,6 +11,11 @@ import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {
+    actorShouldAnchorRight,
+    fitRectToMonitor,
+    monitorForPoint,
+} from './geometry.js';
 import {parseState} from './state.js';
 
 
@@ -32,7 +37,7 @@ const OVERLAY_HANDLE_GAP = 4;
 
 const POLL_INTERVAL_MS = 100;
 const KEYBINDING_NAME = 'toggle-edit-mode';
-const EXTENSION_VERSION = 20;
+const EXTENSION_VERSION = 21;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -412,6 +417,8 @@ function createUserRow(
                 : 'dvo-user-row',
 
         vertical: false,
+        x_expand: true,
+        x_align: Clutter.ActorAlign.FILL,
         reactive: false,
         can_focus: false,
         height: rowHeight,
@@ -603,6 +610,19 @@ function createUserRow(
      *   decorations name | avatar
      */
     if (anchorRight) {
+        /*
+         * Every row is allocated to the width of the widest row. Let a
+         * leading spacer absorb the difference so all avatars share the
+         * same right edge regardless of display-name length.
+         */
+        row.add_child(
+            new St.Widget({
+                x_expand: true,
+                reactive: false,
+                can_focus: false,
+            })
+        );
+
         for (const decoration of decorations)
             namePlate.add_child(decoration);
 
@@ -618,6 +638,14 @@ function createUserRow(
 
         row.add_child(avatarContainer);
         row.add_child(namePlate);
+
+        row.add_child(
+            new St.Widget({
+                x_expand: true,
+                reactive: false,
+                can_focus: false,
+            })
+        );
     }
 
     return row;
@@ -681,6 +709,10 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._dragTarget = null;
         this._dragKind = null;
+        this._dragPointerStartX = 0;
+        this._dragPointerStartY = 0;
+        this._dragTargetStartX = 0;
+        this._dragTargetStartY = 0;
 
         this._positionIdleId = null;
 
@@ -958,6 +990,10 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragging = false;
         this._dragTarget = null;
         this._dragKind = null;
+        this._dragPointerStartX = 0;
+        this._dragPointerStartY = 0;
+        this._dragTargetStartX = 0;
+        this._dragTargetStartY = 0;
     }
 
 
@@ -1569,12 +1605,10 @@ export default class DiscordVoiceOverlay extends Extension {
         }
 
 
+        if (!enabled && this._dragging)
+            this._cancelDrag(true);
+
         this._editMode = enabled;
-        this._dragging = false;
-
-
-        if (this._root)
-            this._root.reactive = enabled;
 
         if (this._overlayDragHandle)
             this._overlayDragHandle.visible = enabled;
@@ -1836,53 +1870,12 @@ export default class DiscordVoiceOverlay extends Extension {
         const monitors =
             Main.layoutManager.monitors ?? [];
 
-        for (const monitor of monitors) {
-            if (
-                x >= monitor.x
-                && x < monitor.x + monitor.width
-                && y >= monitor.y
-                && y < monitor.y + monitor.height
-            ) {
-                return monitor;
-            }
-        }
-
-        let nearest = null;
-        let nearestDistance = Infinity;
-
-        for (const monitor of monitors) {
-            const nearestX =
-                Math.max(
-                    monitor.x,
-                    Math.min(
-                        monitor.x + monitor.width,
-                        x
-                    )
-                );
-
-            const nearestY =
-                Math.max(
-                    monitor.y,
-                    Math.min(
-                        monitor.y + monitor.height,
-                        y
-                    )
-                );
-
-            const distance =
-                (x - nearestX) ** 2
-                + (y - nearestY) ** 2;
-
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearest = monitor;
-            }
-        }
-
-        return (
-            nearest
-            ?? Main.layoutManager.primaryMonitor
-            ?? null
+        return monitorForPoint(
+            monitors,
+            Main.layoutManager.primaryMonitor
+                ?? null,
+            x,
+            y
         );
     }
 
@@ -1922,41 +1915,14 @@ export default class DiscordVoiceOverlay extends Extension {
                 30
             );
 
-        const minX =
-            monitor.x + OVERLAY_MARGIN;
-
-        const minY =
-            monitor.y + OVERLAY_MARGIN;
-
-        const maxX =
-            Math.max(
-                minX,
-                monitor.x
-                + monitor.width
-                - width
-                - OVERLAY_MARGIN
-            );
-
-        const maxY =
-            Math.max(
-                minY,
-                monitor.y
-                + monitor.height
-                - height
-                - OVERLAY_MARGIN
-            );
-
-        return [
-            Math.max(
-                minX,
-                Math.min(maxX, proposedX)
-            ),
-
-            Math.max(
-                minY,
-                Math.min(maxY, proposedY)
-            ),
-        ];
+        return fitRectToMonitor(
+            width,
+            height,
+            monitor,
+            proposedX,
+            proposedY,
+            OVERLAY_MARGIN
+        );
     }
 
 
@@ -2268,6 +2234,7 @@ export default class DiscordVoiceOverlay extends Extension {
         if (
             !this._editMode
             || !target
+            || this._dragging
         ) {
             return Clutter.EVENT_PROPAGATE;
         }
@@ -2314,7 +2281,7 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
-    _finishDrag() {
+    _finishDrag(pointerX, pointerY) {
         const target =
             this._dragTarget;
 
@@ -2324,8 +2291,22 @@ export default class DiscordVoiceOverlay extends Extension {
         if (!target)
             return;
 
+        /*
+         * The pointer is the user's destination. Actor-centre based
+         * selection can choose the old monitor while a wide actor is
+         * crossing a display boundary and snap it backwards.
+         */
         const monitor =
-            this._monitorForActor(target)
+            (
+                Number.isFinite(pointerX)
+                && Number.isFinite(pointerY)
+                    ? this._monitorForPoint(
+                        pointerX,
+                        pointerY
+                    )
+                    : null
+            )
+            ?? this._monitorForActor(target)
             ?? this._focusedMonitor();
 
         if (!monitor)
@@ -2353,11 +2334,11 @@ export default class DiscordVoiceOverlay extends Extension {
                     );
 
                 const anchorRight =
-                    target.x
-                    + width / 2
-                    >
-                    monitor.x
-                    + monitor.width / 2;
+                    actorShouldAnchorRight(
+                        target.x,
+                        width,
+                        monitor
+                    );
 
                 const anchorX =
                     anchorRight
@@ -2410,6 +2391,42 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragging = false;
         this._dragTarget = null;
         this._dragKind = null;
+        this._dragPointerStartX = 0;
+        this._dragPointerStartY = 0;
+        this._dragTargetStartX = 0;
+        this._dragTargetStartY = 0;
+    }
+
+
+    _cancelDrag(restorePosition) {
+        if (
+            !this._dragging
+            || !this._dragTarget
+        ) {
+            this._clearDrag();
+            return;
+        }
+
+        const kind =
+            this._dragKind;
+
+        if (restorePosition) {
+            this._dragTarget.set_position(
+                this._dragTargetStartX,
+                this._dragTargetStartY
+            );
+        }
+
+        this._clearDrag();
+
+        if (
+            kind === 'overlay'
+            && this._editMode
+        ) {
+            this._placeOverlayDragHandle();
+        }
+
+        this._schedulePositionRefresh();
     }
 
 
@@ -2445,11 +2462,38 @@ export default class DiscordVoiceOverlay extends Extension {
             type
             === Clutter.EventType.BUTTON_RELEASE
         ) {
+            if (
+                event.get_button()
+                !== Clutter.BUTTON_PRIMARY
+            ) {
+                return Clutter.EVENT_STOP;
+            }
+
+            const [pointerX, pointerY] =
+                event.get_coords();
+
+            /*
+             * A release can arrive without a final motion event. Apply
+             * its coordinates before fitting and persisting the actor.
+             */
+            this._setDraggedPosition(
+                this._dragTargetStartX
+                    + pointerX
+                    - this._dragPointerStartX,
+
+                this._dragTargetStartY
+                    + pointerY
+                    - this._dragPointerStartY
+            );
+
             /*
              * Persist the destination first, clear the drag state, then
              * perform exactly one rebuild and one edge-fitting pass.
              */
-            this._finishDrag();
+            this._finishDrag(
+                pointerX,
+                pointerY
+            );
             this._clearDrag();
 
             this._lastRenderKey = null;
@@ -2465,12 +2509,7 @@ export default class DiscordVoiceOverlay extends Extension {
             && event.get_key_symbol()
                 === Clutter.KEY_Escape
         ) {
-            this._dragTarget.set_position(
-                this._dragTargetStartX,
-                this._dragTargetStartY
-            );
-
-            this._clearDrag();
+            this._cancelDrag(true);
 
             return Clutter.EVENT_STOP;
         }
@@ -2818,7 +2857,17 @@ export default class DiscordVoiceOverlay extends Extension {
 
 
         if (hiddenCount > 0) {
-            this._userList.add_child(
+            const overflowRow =
+                new St.BoxLayout({
+                    vertical: false,
+                    x_expand: true,
+                    x_align:
+                        Clutter.ActorAlign.FILL,
+                    reactive: false,
+                    can_focus: false,
+                });
+
+            const overflowLabel =
                 new St.Label({
                     text:
                         `+${hiddenCount} more`,
@@ -2830,7 +2879,25 @@ export default class DiscordVoiceOverlay extends Extension {
 
                     reactive: false,
                     can_focus: false,
-                })
+                });
+
+            const spacer =
+                new St.Widget({
+                    x_expand: true,
+                    reactive: false,
+                    can_focus: false,
+                });
+
+            if (anchorRight) {
+                overflowRow.add_child(spacer);
+                overflowRow.add_child(overflowLabel);
+            } else {
+                overflowRow.add_child(overflowLabel);
+                overflowRow.add_child(spacer);
+            }
+
+            this._userList.add_child(
+                overflowRow
             );
         }
 

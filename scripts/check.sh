@@ -8,6 +8,7 @@ UUID='discord-voice-overlay@rayan6ms.github.io'
 EXTENSION_DIR="$PROJECT_DIR/gnome-extension/$UUID"
 METADATA="$EXTENSION_DIR/metadata.json"
 SCHEMA="$EXTENSION_DIR/schemas/org.gnome.shell.extensions.discord-voice-overlay.gschema.xml"
+VERSION_FILE="$PROJECT_DIR/VERSION"
 
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -21,8 +22,10 @@ require_command python3
 require_command rg
 
 node --check "$EXTENSION_DIR/extension.js"
+node --check "$EXTENSION_DIR/geometry.js"
 node --check "$EXTENSION_DIR/prefs.js"
 node --check "$EXTENSION_DIR/state.js"
+node "$SCRIPT_DIR/test-geometry.mjs"
 node "$SCRIPT_DIR/test-state.mjs"
 python3 -m json.tool "$METADATA" >/dev/null
 
@@ -43,7 +46,8 @@ done
 python3 - "$METADATA" "$EXTENSION_DIR/extension.js" \
     "$EXTENSION_DIR/prefs.js" "$SCHEMA" "$EXTENSION_DIR" \
     "$EXTENSION_DIR/state.js" \
-    "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/index.ts" <<'PY'
+    "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/index.ts" \
+    "$VERSION_FILE" <<'PY'
 import json
 from pathlib import Path
 import re
@@ -58,6 +62,7 @@ import xml.etree.ElementTree as ET
     extension_dir,
     state_path,
     plugin_path,
+    version_path,
 ) = (
     map(Path, sys.argv[1:])
 )
@@ -66,7 +71,11 @@ extension = extension_path.read_text(encoding="utf-8")
 prefs = prefs_path.read_text(encoding="utf-8")
 state_module = state_path.read_text(encoding="utf-8")
 plugin = plugin_path.read_text(encoding="utf-8")
+project_version = version_path.read_text(encoding="utf-8").strip()
 root = ET.parse(schema_path).getroot()
+
+if not re.fullmatch(r"\d+\.\d+\.\d+", project_version):
+    raise SystemExit(f"invalid VERSION: {project_version!r}")
 
 required = {
     "uuid",
@@ -143,6 +152,7 @@ if compiled:
     raise SystemExit("gschemas.compiled must not be stored in source")
 
 print(f"Metadata/runtime version: {version}")
+print(f"Project version: {project_version}")
 print(f"State protocol version: {state_protocol.group(1)}")
 print("Default allowlist: []")
 PY

@@ -2,6 +2,29 @@
 
 All notable public changes are documented here.
 
+## [1.0.2] - 2026-07-28
+
+GNOME extension metadata version: 21.
+
+### Added
+
+- A single-source `VERSION` file for release scripts and CI.
+- Install-or-update detection and automatic backup migration for the prerelease `discord-voice-overlay@local` UUID.
+
+### Fixed
+
+- Align every avatar to the same outer edge when the overlay mirrors on the right side.
+- Restore the detached voice-overlay drag handle when a drag is cancelled.
+- Cancel and restore an in-progress drag when edit mode closes or the focused application changes.
+- Ignore non-primary mouse-button releases during a primary-button drag.
+- Use the pointer destination instead of the actor centre when selecting the drop monitor.
+- Apply final button-release coordinates even when no final motion event was delivered.
+
+### Changed
+
+- The primary install command now uses GitHub's stable `releases/latest` URL and serves as the update command too.
+- Overlay rows remain non-reactive in edit mode; only their explicit drag handle captures input.
+
 ## [1.0.1] - 2026-07-28
 
 GNOME extension metadata version: 20.
@@ -60,3 +83,4 @@ Initial public release. GNOME extension metadata version: 19.
 
 [1.0.0]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.0
 [1.0.1]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.1
+[1.0.2]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.2

@@ -3,8 +3,11 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 UUID='discord-voice-overlay@rayan6ms.github.io'
 LEGACY_UUID='discord-voice-overlay@local'
+PROJECT_VERSION=$(sed -n '1p' "$PROJECT_DIR/VERSION")
+RELEASE_TAG="v$PROJECT_VERSION"
 TEMP_DIR=''
 INSTALL_CACHE=''
 
@@ -32,8 +35,8 @@ if [ "$#" -eq 1 ]; then
     ARCHIVE=$1
 else
     TEMP_DIR=$(mktemp -d)
-    "$SCRIPT_DIR/package-extension.sh" "$TEMP_DIR" v1.0.1
-    ARCHIVE="$TEMP_DIR/discord-voice-overlay-gnome-v1.0.1.zip"
+    "$SCRIPT_DIR/package-extension.sh" "$TEMP_DIR" "$RELEASE_TAG"
+    ARCHIVE="$TEMP_DIR/discord-voice-overlay-gnome-$RELEASE_TAG.zip"
 fi
 
 if [ ! -f "$ARCHIVE" ]; then

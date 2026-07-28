@@ -7,7 +7,8 @@ PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 UUID='discord-voice-overlay@rayan6ms.github.io'
 SOURCE_DIR="$PROJECT_DIR/gnome-extension/$UUID"
 OUTPUT_DIR=${1:-"$PROJECT_DIR/dist"}
-RELEASE_TAG=${2:-v1.0.1}
+PROJECT_VERSION=$(sed -n '1p' "$PROJECT_DIR/VERSION")
+RELEASE_TAG=${2:-"v$PROJECT_VERSION"}
 TEMP_DIR=''
 
 case "$RELEASE_TAG" in
@@ -52,6 +53,7 @@ if command -v gnome-extensions >/dev/null 2>&1; then
         gnome-extensions pack \
             --force \
             --out-dir "$TEMP_DIR" \
+            --extra-source=geometry.js \
             --extra-source=state.js \
             .
         zip -X -q "$PACKED_ARCHIVE" \
@@ -86,6 +88,7 @@ import zipfile
 archive, expected_uuid = sys.argv[1:]
 required = {
     "extension.js",
+    "geometry.js",
     "state.js",
     "COPYING",
     "metadata.json",
