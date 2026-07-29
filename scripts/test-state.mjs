@@ -16,6 +16,7 @@ const {
     STATE_PROTOCOL_VERSION,
     STATE_STALE_AFTER_MS,
     parseState,
+    readState,
     stateExpiryDelay
 } = await import(`data:text/javascript;base64,${encoded}`);
 
@@ -42,6 +43,26 @@ function state(overrides = {}) {
 
 assert.equal(parseState(state(), now).connected, true);
 assert.equal(parseState(state(), now).users.length, 1);
+assert.deepEqual(
+    readState(state(), now),
+    {
+        state: {
+            connected: true,
+            channel: {
+                id: "voice",
+                name: "Voice",
+                guildId: "guild"
+            },
+            users: [
+                {
+                    id: "user"
+                }
+            ]
+        },
+        expiryDelay: STATE_STALE_AFTER_MS + 1
+    },
+    "the runtime snapshot should parse state and expiry together"
+);
 assert.equal(
     stateExpiryDelay(state(), now),
     STATE_STALE_AFTER_MS + 1

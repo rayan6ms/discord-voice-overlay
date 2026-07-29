@@ -35,12 +35,19 @@ export function stateTimestampIsFresh(
 }
 
 
-export function stateExpiryDelay(
+export function readState(
     raw,
     now = Date.now()
 ) {
-    if (!raw)
-        return null;
+    const disconnected =
+        emptyState();
+
+    if (!raw) {
+        return {
+            state: disconnected,
+            expiryDelay: null,
+        };
+    }
 
     try {
         const parsed = JSON.parse(raw);
@@ -53,63 +60,76 @@ export function stateExpiryDelay(
             || typeof parsed.publishedAt !== 'number'
             || !Number.isFinite(parsed.publishedAt)
         ) {
-            return null;
+            return {
+                state: disconnected,
+                expiryDelay: null,
+            };
         }
 
         const age = now - parsed.publishedAt;
 
-        if (age < -STATE_FUTURE_TOLERANCE_MS)
-            return null;
-
-        return Math.max(
-            0,
-            STATE_STALE_AFTER_MS - age + 1
-        );
-    } catch {
-        return null;
-    }
-}
-
-
-export function parseState(raw, now = Date.now()) {
-    if (!raw)
-        return emptyState();
-
-    try {
-        const parsed = JSON.parse(raw);
+        const expiryDelay =
+            age < -STATE_FUTURE_TOLERANCE_MS
+                ? null
+                : Math.max(
+                    0,
+                    STATE_STALE_AFTER_MS - age + 1
+                );
 
         if (
-            !parsed
-            || typeof parsed !== 'object'
-            || Array.isArray(parsed)
-            || parsed.version !== STATE_PROTOCOL_VERSION
-            || !stateTimestampIsFresh(
+            !stateTimestampIsFresh(
                 parsed.publishedAt,
                 now
             )
         ) {
-            return emptyState();
+            return {
+                state: disconnected,
+                expiryDelay,
+            };
         }
 
         return {
-            connected: Boolean(parsed.connected),
-            channel:
-                parsed.channel
-                && typeof parsed.channel === 'object'
-                && !Array.isArray(parsed.channel)
-                    ? parsed.channel
-                    : null,
-            users:
-                Array.isArray(parsed.users)
-                    ? parsed.users.filter(
-                        user =>
-                            user
-                            && typeof user === 'object'
-                            && !Array.isArray(user)
-                    )
-                    : [],
+            state: {
+                connected:
+                    Boolean(parsed.connected),
+                channel:
+                    parsed.channel
+                    && typeof parsed.channel === 'object'
+                    && !Array.isArray(parsed.channel)
+                        ? parsed.channel
+                        : null,
+                users:
+                    Array.isArray(parsed.users)
+                        ? parsed.users.filter(
+                            user =>
+                                user
+                                && typeof user === 'object'
+                                && !Array.isArray(user)
+                        )
+                        : [],
+            },
+            expiryDelay,
         };
     } catch {
-        return emptyState();
+        return {
+            state: disconnected,
+            expiryDelay: null,
+        };
     }
+}
+
+
+export function stateExpiryDelay(
+    raw,
+    now = Date.now()
+) {
+    return readState(raw, now).expiryDelay;
+}
+
+
+export function parseState(
+    raw,
+    now = Date.now()
+) {
+    return readState(raw, now).state;
 }

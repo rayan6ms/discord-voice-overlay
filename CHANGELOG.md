@@ -2,6 +2,25 @@
 
 All notable public changes are documented here.
 
+## [1.0.6] - 2026-07-29
+
+GNOME extension metadata version: 25.
+
+### Added
+
+- Test custom, animated, missing, and helper-failure avatar paths in the Vencord bridge.
+
+### Fixed
+
+- Show GNOME's local fallback icon for users with Discord's default avatar instead of an invisible remote background.
+- Include the avatar helper in development installs, release packages, and package validation.
+
+### Changed
+
+- Preserve each user's row and avatar actor across speaking, mute, deafen, and live-state changes.
+- Parse each bridge snapshot once and compare render inputs without serializing the payload again.
+- Skip overlay-position refreshes when an update cannot change the overlay's dimensions.
+
 ## [1.0.5] - 2026-07-28
 
 GNOME extension metadata version: 24.
@@ -150,3 +169,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.3]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.3
 [1.0.4]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.4
 [1.0.5]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.5
+[1.0.6]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.6

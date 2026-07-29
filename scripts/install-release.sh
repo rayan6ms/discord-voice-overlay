@@ -259,7 +259,8 @@ unzip -q "$TEMP_DIR/$PLUGIN_ASSET" -d "$UNPACKED_DIR"
 PLUGIN_SOURCE="$UNPACKED_DIR/discordVoiceOverlay"
 if \
     [ ! -f "$PLUGIN_SOURCE/index.ts" ] \
-    || [ ! -f "$PLUGIN_SOURCE/native.ts" ]
+    || [ ! -f "$PLUGIN_SOURCE/native.ts" ] \
+    || [ ! -f "$PLUGIN_SOURCE/avatar.js" ]
 then
     printf 'The downloaded Vencord plugin package is incomplete.\n' >&2
     exit 1
