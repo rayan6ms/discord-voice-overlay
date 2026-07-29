@@ -17,8 +17,7 @@ import {
 } from './geometry.js';
 import {EditHistory} from './edit-history.js';
 import {
-    parseState,
-    stateExpiryDelay,
+    readState,
 } from './state.js';
 import {StateMonitor} from './state-monitor.js';
 import {UserListRenderer} from './user-list.js';
@@ -51,7 +50,7 @@ const UNDO_EDIT_KEYBINDING = 'undo-edit';
 const REDO_EDIT_KEYBINDING = 'redo-edit';
 const EDIT_HISTORY_LIMIT = 100;
 const DRAG_WATCHDOG_MS = 100;
-const EXTENSION_VERSION = 24;
+const EXTENSION_VERSION = 25;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -163,7 +162,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._positionIdleId = null;
 
-        this._lastRenderKey = null;
+        this._lastRenderState = null;
 
         this._keybindingRegistered = false;
 
@@ -297,7 +296,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
                         this._refreshControls();
 
-                        this._lastRenderKey = null;
+                        this._lastRenderState = null;
                         this._tick(true);
                     }
                 )
@@ -1283,7 +1282,7 @@ export default class DiscordVoiceOverlay extends Extension {
         this._applyPalettePosition();
         this._refreshControls();
 
-        this._lastRenderKey = null;
+        this._lastRenderState = null;
         this._tick(true);
 
         if (this._editMode)
@@ -1462,7 +1461,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._refreshControls();
 
-        this._lastRenderKey = null;
+        this._lastRenderState = null;
         this._tick(true);
     }
 
@@ -2403,7 +2402,7 @@ export default class DiscordVoiceOverlay extends Extension {
             );
         }
 
-        this._lastRenderKey = null;
+        this._lastRenderState = null;
         this._tick(true);
         this._schedulePositionRefresh();
     }
@@ -2568,7 +2567,7 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
-    _scheduleStateExpiry(raw) {
+    _scheduleStateExpiry(delay) {
         if (this._stateExpiryId) {
             GLib.source_remove(
                 this._stateExpiryId
@@ -2576,9 +2575,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
             this._stateExpiryId = null;
         }
-
-        const delay =
-            stateExpiryDelay(raw);
 
         if (
             delay === null
@@ -2635,9 +2631,14 @@ export default class DiscordVoiceOverlay extends Extension {
         const raw =
             this._readRawState();
 
-        this._scheduleStateExpiry(raw);
+        const {
+            state,
+            expiryDelay,
+        } = readState(raw);
 
-        const state = parseState(raw);
+        this._scheduleStateExpiry(
+            expiryDelay
+        );
 
 
         const overlayEnabled =
@@ -2686,26 +2687,34 @@ export default class DiscordVoiceOverlay extends Extension {
                 : [];
 
 
-        const renderKey =
-            JSON.stringify({
-                raw,
-                connected: state.connected,
-                overlayEnabled,
-                speakingOnly,
-                ringInside,
-                avatarSize,
-                nameMaxWidth,
-                maxVisibleUsers,
-                anchorRight,
-                editMode: this._editMode,
-            });
+        const renderState = [
+            raw,
+            state.connected,
+            overlayEnabled,
+            speakingOnly,
+            ringInside,
+            avatarSize,
+            nameMaxWidth,
+            maxVisibleUsers,
+            anchorRight,
+            this._editMode,
+        ];
+
+        const renderChanged =
+            !this._lastRenderState
+            || renderState.some(
+                (value, index) =>
+                    value
+                    !== this._lastRenderState[index]
+            );
 
 
         if (
             force
-            || renderKey !== this._lastRenderKey
+            || renderChanged
         ) {
-            this._lastRenderKey = renderKey;
+            this._lastRenderState =
+                renderState;
 
             const monitor =
                 this._monitorForActor(

@@ -15,6 +15,8 @@ import {
     VoiceStateStore
 } from "@webpack/common";
 
+import { getAvatarUrl } from "./avatar";
+
 
 const Native = VencordNative.pluginHelpers.DiscordVoiceOverlay as PluginNative<typeof import("./native")>;
 
@@ -96,53 +98,6 @@ function getVoiceChannelId(): string | null {
     current ??= SelectedChannelStore.getVoiceChannelId();
 
     return current ?? null;
-}
-
-
-function getAvatarUrl(user: any): string {
-    /*
-     * Discord's User object normally provides getAvatarURL().
-     * Prefer it so Discord itself handles avatar format/defaults.
-     */
-    try {
-        if (typeof user?.getAvatarURL === "function") {
-            const url = user.getAvatarURL(undefined, 64, true);
-
-            if (url)
-                return url;
-        }
-    } catch {
-        // Fall through to constructing the CDN URL ourselves.
-    }
-
-    if (user?.avatar) {
-        const extension =
-            String(user.avatar).startsWith("a_")
-                ? "gif"
-                : "png";
-
-        return (
-            "https://cdn.discordapp.com/avatars/"
-            + `${user.id}/${user.avatar}.${extension}?size=64`
-        );
-    }
-
-    /*
-     * Handles both legacy discriminator accounts and the newer
-     * username system's six default avatars.
-     */
-    let defaultIndex = 0;
-
-    try {
-        if (user?.discriminator && user.discriminator !== "0")
-            defaultIndex = Number(user.discriminator) % 5;
-        else
-            defaultIndex = Number((BigInt(user.id) >> 22n) % 6n);
-    } catch {
-        defaultIndex = 0;
-    }
-
-    return `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
 }
 
 

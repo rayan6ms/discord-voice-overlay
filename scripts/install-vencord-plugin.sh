@@ -56,7 +56,11 @@ if [ "$#" -gt 1 ]; then
     exit 2
 fi
 
-if [ ! -f "$SOURCE_DIR/index.ts" ] || [ ! -f "$SOURCE_DIR/native.ts" ]; then
+if \
+    [ ! -f "$SOURCE_DIR/index.ts" ] \
+    || [ ! -f "$SOURCE_DIR/native.ts" ] \
+    || [ ! -f "$SOURCE_DIR/avatar.js" ]
+then
     printf 'Vencord plugin source is incomplete: %s\n' "$SOURCE_DIR" >&2
     exit 1
 fi
@@ -79,6 +83,7 @@ INSTALL_TMP=$(mktemp -d "$USER_PLUGINS/.discordVoiceOverlay.installing.XXXXXX")
 
 cp "$SOURCE_DIR/index.ts" "$INSTALL_TMP/index.ts"
 cp "$SOURCE_DIR/native.ts" "$INSTALL_TMP/native.ts"
+cp "$SOURCE_DIR/avatar.js" "$INSTALL_TMP/avatar.js"
 
 if [ -e "$TARGET_DIR" ]; then
     DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}

@@ -31,7 +31,7 @@ assert.equal(
     'equivalent rows should reuse the same actor'
 );
 
-assert.notEqual(
+assert.equal(
     userRowKey(users[0], rowOptions),
     userRowKey(
         {
@@ -40,7 +40,19 @@ assert.notEqual(
         },
         rowOptions
     ),
-    'a speaking change must invalidate only that user row'
+    'speaking changes should update the existing row in place'
+);
+
+assert.notEqual(
+    userRowKey(users[0], rowOptions),
+    userRowKey(
+        {
+            ...users[0],
+            avatar: 'https://example.com/new-avatar.png',
+        },
+        rowOptions
+    ),
+    'an avatar change must replace only that user row'
 );
 
 assert.deepEqual(

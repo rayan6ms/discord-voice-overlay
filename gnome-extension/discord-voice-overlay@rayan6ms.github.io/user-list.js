@@ -133,6 +133,8 @@ function createUserRow(
     });
 
     let avatarContainer;
+    let insideRing = null;
+    let avatarFrame = null;
 
     if (ringInside) {
         const avatarStack = new St.Widget({
@@ -159,37 +161,37 @@ function createUserRow(
 
         avatarStack.add_child(avatar);
 
-        if (user.speaking) {
-            avatarStack.add_child(
-                new St.Widget({
-                    style_class:
-                        'dvo-avatar-ring-inside',
+        insideRing =
+            new St.Widget({
+                style_class:
+                    'dvo-avatar-ring-inside',
 
-                    width: avatarSize,
-                    height: avatarSize,
-                    reactive: false,
-                    can_focus: false,
-                    x_align:
-                        Clutter.ActorAlign.CENTER,
-                    y_align:
-                        Clutter.ActorAlign.CENTER,
-                })
-            );
-        }
+                width: avatarSize,
+                height: avatarSize,
+                reactive: false,
+                can_focus: false,
+                x_align:
+                    Clutter.ActorAlign.CENTER,
+                y_align:
+                    Clutter.ActorAlign.CENTER,
+            });
+
+        avatarStack.add_child(insideRing);
 
         avatarContainer = avatarStack;
     } else {
-        const avatarFrame = new St.Bin({
-            style_class:
-                user.speaking
-                    ? 'dvo-avatar-frame dvo-avatar-frame-speaking'
-                    : 'dvo-avatar-frame',
+        avatarFrame =
+            new St.Bin({
+                style_class:
+                    'dvo-avatar-frame',
 
-            reactive: false,
-            can_focus: false,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
+                reactive: false,
+                can_focus: false,
+                x_align:
+                    Clutter.ActorAlign.CENTER,
+                y_align:
+                    Clutter.ActorAlign.CENTER,
+            });
 
         avatarFrame.set_child(
             avatarActor(
@@ -201,21 +203,11 @@ function createUserRow(
         avatarContainer = avatarFrame;
     }
 
-    let plateOpacity = 255;
-
-    if (!user.speaking) {
-        plateOpacity =
-            user.muted || user.deafened
-                ? 150
-                : 185;
-    }
-
     const namePlate = new St.BoxLayout({
         style_class: 'dvo-name-plate',
         vertical: false,
         reactive: false,
         can_focus: false,
-        opacity: plateOpacity,
         height: namePlateHeight,
         y_align: Clutter.ActorAlign.CENTER,
     });
@@ -247,41 +239,39 @@ function createUserRow(
 
     const decorations = [];
 
-    const userIsLive =
-        Boolean(
-            user.live
-            ?? user.streaming
-        );
+    const liveBadge =
+        new St.Label({
+            text: 'LIVE',
+            style_class: 'dvo-live-badge',
+            reactive: false,
+            can_focus: false,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
 
-    if (userIsLive) {
-        decorations.push(
-            new St.Label({
-                text: 'LIVE',
-                style_class: 'dvo-live-badge',
-                reactive: false,
-                can_focus: false,
-                y_align: Clutter.ActorAlign.CENTER,
-            })
-        );
-    }
+    decorations.push(liveBadge);
+
+    let mutedIcon = null;
+    let deafenedIcon = null;
 
     if (!speakingOnly) {
-        if (user.muted && statusIcons?.muted) {
-            decorations.push(
+        if (statusIcons?.muted) {
+            mutedIcon =
                 createStatusIcon(
                     statusIcons.muted,
                     'dvo-status-muted'
-                )
-            );
+                );
+
+            decorations.push(mutedIcon);
         }
 
-        if (user.deafened && statusIcons?.deafened) {
-            decorations.push(
+        if (statusIcons?.deafened) {
+            deafenedIcon =
                 createStatusIcon(
                     statusIcons.deafened,
                     'dvo-status-deafened'
-                )
-            );
+                );
+
+            decorations.push(deafenedIcon);
         }
     }
 
@@ -333,7 +323,82 @@ function createUserRow(
         );
     }
 
-    return row;
+    let lastLive = null;
+    let lastMuted = null;
+    let lastDeafened = null;
+
+    const update = currentUser => {
+        const speaking =
+            Boolean(currentUser.speaking);
+
+        const live =
+            Boolean(
+                currentUser.live
+                ?? currentUser.streaming
+            );
+
+        const muted =
+            Boolean(
+                mutedIcon
+                && currentUser.muted
+            );
+
+        const deafened =
+            Boolean(
+                deafenedIcon
+                && currentUser.deafened
+            );
+
+        const sizeChanged =
+            lastLive !== null
+            && (
+                live !== lastLive
+                || muted !== lastMuted
+                || deafened !== lastDeafened
+            );
+
+        if (insideRing)
+            insideRing.visible = speaking;
+
+        if (avatarFrame) {
+            avatarFrame.set_style_class_name(
+                speaking
+                    ? 'dvo-avatar-frame dvo-avatar-frame-speaking'
+                    : 'dvo-avatar-frame'
+            );
+        }
+
+        namePlate.opacity =
+            speaking
+                ? 255
+                : (
+                    currentUser.muted
+                    || currentUser.deafened
+                        ? 150
+                        : 185
+                );
+
+        liveBadge.visible = live;
+
+        if (mutedIcon)
+            mutedIcon.visible = muted;
+
+        if (deafenedIcon)
+            deafenedIcon.visible = deafened;
+
+        lastLive = live;
+        lastMuted = muted;
+        lastDeafened = deafened;
+
+        return sizeChanged;
+    };
+
+    update(user);
+
+    return {
+        actor: row,
+        update,
+    };
 }
 
 
@@ -427,6 +492,9 @@ export class UserListRenderer {
             return;
         }
 
+        let sizeChanged =
+            Boolean(this._placeholder);
+
         if (this._placeholder) {
             this._placeholder.destroy();
             this._placeholder = null;
@@ -479,11 +547,13 @@ export class UserListRenderer {
 
             if (!cached || cached.key !== key) {
                 if (cached)
-                    cached.actor.destroy();
+                    cached.row.actor.destroy();
+
+                sizeChanged = true;
 
                 cached = {
                     key,
-                    actor:
+                    row:
                         createUserRow(
                             user,
                             avatarSize,
@@ -501,15 +571,21 @@ export class UserListRenderer {
                 );
             }
 
+            sizeChanged =
+                cached.row.update(user)
+                || sizeChanged;
+
             retainedRows.add(cacheId);
             desiredActors.push(
-                cached.actor
+                cached.row.actor
             );
         }
 
-        this._destroyRowsExcept(
-            retainedRows
-        );
+        sizeChanged =
+            this._destroyRowsExcept(
+                retainedRows
+            )
+            || sizeChanged;
 
         for (
             let index = 0;
@@ -523,6 +599,19 @@ export class UserListRenderer {
         }
 
         if (hiddenCount > 0) {
+            const overflowText =
+                `+${hiddenCount} more`;
+
+            if (
+                !this._overflowRow
+                || this._overflowAnchorRight
+                    !== anchorRight
+                || this._overflowLabel?.text
+                    !== overflowText
+            ) {
+                sizeChanged = true;
+            }
+
             this._ensureOverflow(
                 anchorRight
             );
@@ -534,13 +623,16 @@ export class UserListRenderer {
             );
 
             this._overflowLabel.text =
-                `+${hiddenCount} more`;
+                overflowText;
 
             this._placeActor(
                 this._overflowRow,
                 desiredActors.length
             );
         } else {
+            if (this._overflowRow)
+                sizeChanged = true;
+
             this._destroyOverflow();
         }
 
@@ -549,6 +641,19 @@ export class UserListRenderer {
             && editMode
             && !(stateConnected && speakingOnly)
         ) {
+            const placeholderText =
+                stateConnected
+                    ? 'No voice users'
+                    : 'Discord voice: disconnected';
+
+            if (
+                !this._placeholder
+                || this._placeholder.text
+                    !== placeholderText
+            ) {
+                sizeChanged = true;
+            }
+
             this._placeholder ??=
                 new St.Label({
                     style_class: 'dvo-placeholder',
@@ -556,9 +661,7 @@ export class UserListRenderer {
                 });
 
             this._placeholder.text =
-                stateConnected
-                    ? 'No voice users'
-                    : 'Discord voice: disconnected';
+                placeholderText;
 
             this._placeActor(
                 this._placeholder,
@@ -566,18 +669,24 @@ export class UserListRenderer {
             );
         }
 
-        this._onSizeChanged?.();
+        if (sizeChanged)
+            this._onSizeChanged?.();
     }
 
 
     _destroyRowsExcept(retainedRows) {
+        let changed = false;
+
         for (const [id, cached] of this._rows) {
             if (retainedRows.has(id))
                 continue;
 
-            cached.actor.destroy();
+            cached.row.actor.destroy();
             this._rows.delete(id);
+            changed = true;
         }
+
+        return changed;
     }
 
 
