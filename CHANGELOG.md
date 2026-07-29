@@ -2,6 +2,30 @@
 
 All notable public changes are documented here.
 
+## [1.0.4] - 2026-07-28
+
+GNOME extension metadata version: 23.
+
+### Added
+
+- Undo and redo for edit-mode changes with Ctrl+Z, Ctrl+Y, and Ctrl+Shift+Z.
+- Escape now exits edit mode and restores every setting and position from the start of that edit session.
+- Tested bounded edit history so a new change correctly clears the redo branch.
+
+### Fixed
+
+- Deliver grabbed motion and release events directly to each drag handle instead of waiting for events on the stage.
+- Release the pointer grab through a watchdog if an abnormal input path still loses the button-release signal.
+- Stop emitting GNOME Shell theme warnings for avatar positioning and username sizing.
+- Stop the refresh timer from touching overlay actors after GNOME Shell destroys them during shutdown.
+- Restore an existing development bridge if its replacement is interrupted.
+
+### Changed
+
+- Validate release tags as exact semantic versions instead of accepting partial glob matches.
+- Verify both downloaded release packages against explicit published checksums.
+- Remove an unused `unzip` requirement from extension packaging.
+
 ## [1.0.3] - 2026-07-28
 
 GNOME extension metadata version: 22.
@@ -107,3 +131,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.1]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.1
 [1.0.2]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.2
 [1.0.3]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.3
+[1.0.4]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.4

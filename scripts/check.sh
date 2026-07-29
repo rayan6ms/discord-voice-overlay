@@ -22,10 +22,12 @@ require_command python3
 require_command rg
 
 node --check "$EXTENSION_DIR/extension.js"
+node --check "$EXTENSION_DIR/edit-history.js"
 node --check "$EXTENSION_DIR/geometry.js"
 node --check "$EXTENSION_DIR/prefs.js"
 node --check "$EXTENSION_DIR/state.js"
 node "$SCRIPT_DIR/test-geometry.mjs"
+node "$SCRIPT_DIR/test-edit-history.mjs"
 node "$SCRIPT_DIR/test-state.mjs"
 python3 -m json.tool "$METADATA" >/dev/null
 
@@ -146,6 +148,26 @@ if allowed_key is None:
 default = allowed_key.findtext("default", default="").strip()
 if default != "[]":
     raise SystemExit(f"public allowlist default must be [], found {default!r}")
+
+schema_keys = {
+    key.attrib.get("name"): key
+    for key in root.iter("key")
+}
+expected_edit_shortcuts = {
+    "cancel-edit": "['Escape']",
+    "undo-edit": "['<Control>z']",
+    "redo-edit": "['<Control>y', '<Control><Shift>z']",
+}
+for key_name, expected_default in expected_edit_shortcuts.items():
+    key = schema_keys.get(key_name)
+    if key is None:
+        raise SystemExit(f"edit shortcut key is missing: {key_name}")
+    actual_default = key.findtext("default", default="").strip()
+    if actual_default != expected_default:
+        raise SystemExit(
+            f"{key_name} default is {actual_default!r}, "
+            f"expected {expected_default!r}"
+        )
 
 compiled = list(extension_dir.rglob("gschemas.compiled"))
 if compiled:

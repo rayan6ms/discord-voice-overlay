@@ -115,6 +115,10 @@ run_pnpm() {
         npm)
             npm exec --yes --package="$PNPM_PACKAGE" -- pnpm "$@"
             ;;
+        *)
+            printf 'Internal error: pnpm runner was not configured.\n' >&2
+            exit 1
+            ;;
     esac
 }
 

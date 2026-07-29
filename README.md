@@ -72,6 +72,8 @@ The default edit-mode shortcut is **Ctrl+,**. Press it while an allowed applicat
 - **Avatar**, **Name**, and **Users** adjust the layout.
 - Drag **Voice overlay** and **Controls** independently.
 - Select **Done** or press **Ctrl+,** again when finished.
+- Press **Ctrl+Z** to undo and **Ctrl+Y** to redo.
+- Press **Esc** to leave edit mode and discard that edit session.
 
 You can change or disable the shortcut in extension preferences.
 
