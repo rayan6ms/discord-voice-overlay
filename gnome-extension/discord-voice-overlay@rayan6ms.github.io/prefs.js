@@ -38,6 +38,9 @@ const ApplicationPickerProxy =
 
 
 function normalizedIdentifiers(values) {
+    if (!Array.isArray(values))
+        return [];
+
     return [
         ...new Set(
             values
@@ -797,7 +800,12 @@ export default class DiscordVoiceOverlayPreferences
                     Array.isArray(
                         payload?.applications
                     )
-                        ? payload.applications
+                        ? payload.applications.filter(
+                            application =>
+                                application
+                                && typeof application
+                                    === 'object'
+                        )
                         : [];
 
                 const key =

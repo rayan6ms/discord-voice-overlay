@@ -2,6 +2,28 @@
 
 All notable public changes are documented here.
 
+## [1.0.3] - 2026-07-28
+
+GNOME extension metadata version: 22.
+
+### Added
+
+- Automatic use of Vencord's declared pnpm version through Corepack or npm when pnpm is not installed.
+- A right-edge overlay screenshot in the README.
+
+### Fixed
+
+- Grab pointer input for the full drag so fast cursor movement cannot lose the button-release event.
+- End a stale drag without snapping when motion arrives after the primary button is no longer pressed.
+- Isolate unusual or disappearing windows so one failed identity lookup cannot break the application picker.
+- Ignore malformed application-picker rows instead of failing the preferences page.
+- Restore the previous Vencord bridge automatically when an update build fails.
+
+### Changed
+
+- Shortened the README by removing manual installation, duplicate update guidance, niche troubleshooting, security-reporting, and development sections.
+- Removed the redundant README from the packaged Vencord bridge.
+
 ## [1.0.2] - 2026-07-28
 
 GNOME extension metadata version: 21.
@@ -84,3 +106,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.0]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.0
 [1.0.1]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.1
 [1.0.2]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.2
+[1.0.3]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.3
