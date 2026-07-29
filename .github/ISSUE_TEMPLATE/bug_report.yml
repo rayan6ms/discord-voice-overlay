@@ -68,11 +68,3 @@ body:
       label: Relevant extension or Vencord errors
       description: Redact private data. Include focused journal or Vencord console output.
       render: shell
-  - type: textarea
-    id: dbus
-    attributes:
-      label: D-Bus application-list result
-      description: Run the ListOpenApplications `gdbus` command from the README and paste its redacted result.
-      render: shell
-    validations:
-      required: true

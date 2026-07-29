@@ -10,6 +10,11 @@ VENCORD_PATH=${VENCORD_DIR:-"$HOME/.local/src/Vencord"}
 TEMP_DIR=''
 INSTALL_STAGE=''
 INSTALL_CACHE=''
+PNPM_RUNNER=''
+PNPM_PACKAGE=''
+PLUGIN_TARGET=''
+PLUGIN_BACKUP=''
+PLUGIN_ROLLBACK_NEEDED=false
 
 case "$RELEASE_TAG" in
     v[0-9]*.[0-9]*.[0-9]*) ;;
@@ -20,6 +25,17 @@ case "$RELEASE_TAG" in
 esac
 
 cleanup() {
+    if [ "$PLUGIN_ROLLBACK_NEEDED" = true ]; then
+        if [ -n "$PLUGIN_TARGET" ] && [ -e "$PLUGIN_TARGET" ]; then
+            rm -rf -- "$PLUGIN_TARGET"
+        fi
+
+        if [ -n "$PLUGIN_BACKUP" ] && [ -e "$PLUGIN_BACKUP" ]; then
+            mv "$PLUGIN_BACKUP" "$PLUGIN_TARGET"
+            printf 'Restored the previous Vencord bridge after the failed update.\n' >&2
+        fi
+    fi
+
     if [ -n "$INSTALL_STAGE" ] && [ -d "$INSTALL_STAGE" ]; then
         rm -rf -- "$INSTALL_STAGE"
     fi
@@ -32,13 +48,99 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-for command in curl git gnome-extensions node pnpm sha256sum unzip; do
+for command in curl git gnome-extensions node sha256sum unzip; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Missing required command: %s\n' "$command" >&2
         printf 'See the Requirements section in the project README.\n' >&2
         exit 1
     fi
 done
+
+NODE_MAJOR=$(node -p 'Number(process.versions.node.split(".")[0])')
+
+case "$NODE_MAJOR" in
+    ''|*[!0-9]*)
+        printf 'Could not determine the installed Node.js version.\n' >&2
+        exit 1
+        ;;
+esac
+
+if [ "$NODE_MAJOR" -lt 22 ]; then
+    printf 'Node.js 22 or newer is required by Vencord; found %s.\n' \
+        "$(node --version)" >&2
+    exit 1
+fi
+
+if \
+    ! command -v pnpm >/dev/null 2>&1 \
+    && ! command -v corepack >/dev/null 2>&1 \
+    && ! command -v npm >/dev/null 2>&1
+then
+    printf 'A pnpm runner is required.\n' >&2
+    printf 'Install pnpm, or install Node.js with Corepack or npm included.\n' >&2
+    exit 1
+fi
+
+configure_pnpm() {
+    package_manager=$(
+        cd "$VENCORD_PATH"
+        node -p 'require("./package.json").packageManager ?? ""'
+    )
+
+    case "$package_manager" in
+        pnpm@*)
+            pnpm_version=${package_manager#pnpm@}
+            ;;
+        *)
+            printf 'Vencord does not declare a usable pnpm version.\n' >&2
+            exit 1
+            ;;
+    esac
+
+    PNPM_PACKAGE="pnpm@${pnpm_version%%+*}"
+
+    if \
+        command -v corepack >/dev/null 2>&1 \
+        && (
+            cd "$VENCORD_PATH"
+            corepack pnpm --version >/dev/null 2>&1
+        )
+    then
+        PNPM_RUNNER='corepack'
+    elif command -v pnpm >/dev/null 2>&1; then
+        PNPM_RUNNER='pnpm'
+    elif \
+        command -v npm >/dev/null 2>&1 \
+        && npm exec --yes --package="$PNPM_PACKAGE" -- \
+            pnpm --version >/dev/null 2>&1
+    then
+        PNPM_RUNNER='npm'
+    else
+        printf 'Could not prepare pnpm for the Vencord build.\n' >&2
+        exit 1
+    fi
+
+    printf 'Using %s through %s.\n' \
+        "$package_manager" "$PNPM_RUNNER"
+}
+
+run_pnpm() {
+    case "$PNPM_RUNNER" in
+        corepack)
+            corepack pnpm "$@"
+            ;;
+        pnpm)
+            pnpm "$@"
+            ;;
+        npm)
+            npm exec --yes --package="$PNPM_PACKAGE" -- pnpm "$@"
+            ;;
+        *)
+            printf 'Internal error: pnpm runner was not configured.\n' >&2
+            exit 1
+            ;;
+    esac
+}
 
 DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
 EXTENSION_DIR="$DATA_HOME/gnome-shell/extensions/$UUID"
@@ -86,10 +188,12 @@ else
     git -C "$VENCORD_PATH" pull --ff-only
 fi
 
+configure_pnpm
+
 printf 'Installing Vencord dependencies…\n'
 (
     cd "$VENCORD_PATH"
-    pnpm install --frozen-lockfile
+    run_pnpm install --frozen-lockfile
 )
 
 UNPACKED_DIR="$TEMP_DIR/unpacked"
@@ -107,6 +211,7 @@ fi
 
 USER_PLUGINS="$VENCORD_PATH/src/userplugins"
 TARGET_DIR="$USER_PLUGINS/discordVoiceOverlay"
+PLUGIN_TARGET=$TARGET_DIR
 mkdir -p "$USER_PLUGINS"
 INSTALL_STAGE=$(mktemp -d "$USER_PLUGINS/.discordVoiceOverlay.installing.XXXXXX")
 cp -R "$PLUGIN_SOURCE/." "$INSTALL_STAGE/"
@@ -117,18 +222,21 @@ if [ -e "$TARGET_DIR" ]; then
     TIMESTAMP=$(date -u '+%Y%m%dT%H%M%SZ')
     BACKUP_DIR="$BACKUP_ROOT/discordVoiceOverlay-$TIMESTAMP-$$"
     mv "$TARGET_DIR" "$BACKUP_DIR"
+    PLUGIN_BACKUP=$BACKUP_DIR
     printf 'Backed up the previous bridge to %s\n' "$BACKUP_DIR"
 fi
 
 mv "$INSTALL_STAGE" "$TARGET_DIR"
 INSTALL_STAGE=''
+PLUGIN_ROLLBACK_NEEDED=true
 
 printf 'Building Vencord with DiscordVoiceOverlay…\n'
 (
     cd "$VENCORD_PATH"
-    pnpm build
-    pnpm inject
+    run_pnpm build
+    run_pnpm inject
 )
+PLUGIN_ROLLBACK_NEEDED=false
 
 mkdir -p "$DATA_HOME/gnome-shell"
 INSTALL_CACHE=$(mktemp -d "$DATA_HOME/gnome-shell/.dvo-install-cache.XXXXXX")

@@ -37,7 +37,7 @@ const OVERLAY_HANDLE_GAP = 4;
 
 const POLL_INTERVAL_MS = 100;
 const KEYBINDING_NAME = 'toggle-edit-mode';
-const EXTENSION_VERSION = 21;
+const EXTENSION_VERSION = 22;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -91,6 +91,24 @@ function cleanIdentifier(value) {
 }
 
 
+function optionalCall(object, methodName) {
+    try {
+        const method = object?.[methodName];
+
+        if (typeof method !== 'function')
+            return null;
+
+        return method.call(object);
+    } catch {
+        /*
+         * A single unusual or disappearing MetaWindow must not break
+         * focus matching or the entire application picker.
+         */
+        return null;
+    }
+}
+
+
 /*
  * Keep application picking and focus matching on the exact same set of
  * identifiers. The first value is the preferred display identifier, while
@@ -101,10 +119,10 @@ function windowIdentityCandidates(window) {
         return [];
 
     const values = [
-        window.get_wm_class?.(),
-        window.get_wm_class_instance?.(),
-        window.get_gtk_application_id?.(),
-        window.get_sandboxed_app_id?.(),
+        optionalCall(window, 'get_wm_class'),
+        optionalCall(window, 'get_wm_class_instance'),
+        optionalCall(window, 'get_gtk_application_id'),
+        optionalCall(window, 'get_sandboxed_app_id'),
     ];
 
     return [
@@ -201,13 +219,19 @@ function listOpenApplicationsJson() {
     for (const window of windows) {
         if (
             !window
-            || window.is_override_redirect?.()
+            || optionalCall(
+                window,
+                'is_override_redirect'
+            )
         ) {
             continue;
         }
 
         const windowType =
-            window.get_window_type?.();
+            optionalCall(
+                window,
+                'get_window_type'
+            );
 
         if (
             windowType !== undefined
@@ -225,11 +249,22 @@ function listOpenApplicationsJson() {
 
         eligibleWindowCount += 1;
 
-        const app =
-            tracker.get_window_app(window);
+        let app = null;
+
+        try {
+            app =
+                tracker.get_window_app(window);
+        } catch {
+            /*
+             * Keep the window pickable by its Meta identifiers even if
+             * Shell cannot associate it with a desktop application.
+             */
+        }
 
         const rawDesktopId =
-            cleanIdentifier(app?.get_id?.());
+            cleanIdentifier(
+                optionalCall(app, 'get_id')
+            );
 
         /*
          * Shell uses transient window:<id> identifiers for applications
@@ -243,11 +278,13 @@ function listOpenApplicationsJson() {
 
         const title =
             cleanIdentifier(
-                window.get_title?.()
+                optionalCall(window, 'get_title')
             );
 
         const name =
-            cleanIdentifier(app?.get_name?.())
+            cleanIdentifier(
+                optionalCall(app, 'get_name')
+            )
             || title
             || identifiers[0];
 
@@ -709,6 +746,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._dragTarget = null;
         this._dragKind = null;
+        this._dragGrab = null;
         this._dragPointerStartX = 0;
         this._dragPointerStartY = 0;
         this._dragTargetStartX = 0;
@@ -876,6 +914,12 @@ export default class DiscordVoiceOverlay extends Extension {
          */
         this._setUnredirectDisabled(false);
 
+        /*
+         * A Clutter grab must be dismissed before its actor or captured
+         * event handler is destroyed.
+         */
+        this._cancelDrag(false);
+
         if (this._keybindingRegistered) {
             Main.wm.removeKeybinding(
                 KEYBINDING_NAME
@@ -990,6 +1034,7 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragging = false;
         this._dragTarget = null;
         this._dragKind = null;
+        this._dragGrab = null;
         this._dragPointerStartX = 0;
         this._dragPointerStartY = 0;
         this._dragTargetStartX = 0;
@@ -1045,11 +1090,12 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._dragHandle.connect(
             'button-press-event',
-            (_actor, event) =>
+            (actor, event) =>
                 this._beginDrag(
                     event,
                     this._toolbar,
-                    'palette'
+                    'palette',
+                    actor
                 )
         );
 
@@ -1381,11 +1427,12 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._overlayDragHandle.connect(
             'button-press-event',
-            (_actor, event) =>
+            (actor, event) =>
                 this._beginDrag(
                     event,
                     this._root,
-                    'overlay'
+                    'overlay',
+                    actor
                 )
         );
 
@@ -2230,10 +2277,11 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
-    _beginDrag(event, target, kind) {
+    _beginDrag(event, target, kind, grabActor) {
         if (
             !this._editMode
             || !target
+            || !grabActor
             || this._dragging
         ) {
             return Clutter.EVENT_PROPAGATE;
@@ -2260,6 +2308,27 @@ export default class DiscordVoiceOverlay extends Extension {
 
         const [pointerX, pointerY] =
             event.get_coords();
+
+        /*
+         * Keep receiving motion and release events when the pointer moves
+         * faster than the handle or leaves a window surface. Without an
+         * explicit grab, the release can be lost and leave a stale drag.
+         */
+        try {
+            this._dragGrab =
+                global.stage.grab(grabActor);
+        } catch (error) {
+            console.error(
+                '[DiscordVoiceOverlay] Could not grab input for dragging:',
+                error
+            );
+
+            this._dragGrab = null;
+            return Clutter.EVENT_PROPAGATE;
+        }
+
+        if (!this._dragGrab)
+            return Clutter.EVENT_PROPAGATE;
 
         this._dragging = true;
         this._dragTarget = target;
@@ -2388,6 +2457,22 @@ export default class DiscordVoiceOverlay extends Extension {
 
 
     _clearDrag() {
+        const grab =
+            this._dragGrab;
+
+        this._dragGrab = null;
+
+        if (grab) {
+            try {
+                grab.dismiss();
+            } catch (error) {
+                console.error(
+                    '[DiscordVoiceOverlay] Could not release drag input:',
+                    error
+                );
+            }
+        }
+
         this._dragging = false;
         this._dragTarget = null;
         this._dragKind = null;
@@ -2444,6 +2529,27 @@ export default class DiscordVoiceOverlay extends Extension {
         if (type === Clutter.EventType.MOTION) {
             const [pointerX, pointerY] =
                 event.get_coords();
+
+            const [, , modifiers] =
+                global.get_pointer();
+
+            if (
+                !(
+                    modifiers
+                    & Clutter.ModifierType.BUTTON1_MASK
+                )
+            ) {
+                /*
+                 * Defensive fallback for a release that was already lost:
+                 * keep the last valid position instead of snapping to the
+                 * cursor on a later unpressed motion event.
+                 */
+                this._finishDrag();
+                this._clearDrag();
+                this._schedulePositionRefresh();
+
+                return Clutter.EVENT_STOP;
+            }
 
             this._setDraggedPosition(
                 this._dragTargetStartX

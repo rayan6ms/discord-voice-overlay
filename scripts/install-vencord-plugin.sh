@@ -68,9 +68,6 @@ INSTALL_TMP=$(mktemp -d "$USER_PLUGINS/.discordVoiceOverlay.installing.XXXXXX")
 
 cp "$SOURCE_DIR/index.ts" "$INSTALL_TMP/index.ts"
 cp "$SOURCE_DIR/native.ts" "$INSTALL_TMP/native.ts"
-if [ -f "$SOURCE_DIR/README.md" ]; then
-    cp "$SOURCE_DIR/README.md" "$INSTALL_TMP/README.md"
-fi
 
 if [ -e "$TARGET_DIR" ]; then
     DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
