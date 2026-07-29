@@ -15,7 +15,8 @@ const encoded = Buffer.from(source).toString("base64");
 const {
     STATE_PROTOCOL_VERSION,
     STATE_STALE_AFTER_MS,
-    parseState
+    parseState,
+    stateExpiryDelay
 } = await import(`data:text/javascript;base64,${encoded}`);
 
 const now = 2_000_000_000_000;
@@ -41,6 +42,32 @@ function state(overrides = {}) {
 
 assert.equal(parseState(state(), now).connected, true);
 assert.equal(parseState(state(), now).users.length, 1);
+assert.equal(
+    stateExpiryDelay(state(), now),
+    STATE_STALE_AFTER_MS + 1
+);
+
+assert.equal(
+    stateExpiryDelay(
+        state({
+            publishedAt:
+                now - STATE_STALE_AFTER_MS
+        }),
+        now
+    ),
+    1
+);
+
+assert.equal(
+    stateExpiryDelay(
+        state({
+            publishedAt:
+                now - STATE_STALE_AFTER_MS - 1
+        }),
+        now
+    ),
+    0
+);
 
 assert.equal(
     parseState(
@@ -92,6 +119,11 @@ assert.equal(
 assert.equal(
     parseState("{not json", now).connected,
     false
+);
+
+assert.equal(
+    stateExpiryDelay("{not json", now),
+    null
 );
 
 console.log("State freshness tests passed.");

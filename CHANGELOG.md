@@ -2,6 +2,23 @@
 
 All notable public changes are documented here.
 
+## [1.0.5] - 2026-07-28
+
+GNOME extension metadata version: 24.
+
+### Added
+
+- Publish Discord voice changes from relevant Flux events instead of repeatedly rebuilding unchanged state.
+- Monitor atomic state-file replacements with Gio for immediate GNOME updates, with a one-second fallback only if monitoring is unavailable.
+- Reuse unchanged user-row actors and avatar textures when another user's state changes.
+- Test atomic state monitoring latency and the pure render-layout model.
+
+### Changed
+
+- Remove the fixed 200 ms Discord polling loop and 100 ms GNOME polling loop; idle operation now requires only the existing 15-second crash-detection heartbeat.
+- Schedule stale-state invalidation at its exact deadline instead of discovering it through polling.
+- Split window discovery, state monitoring, render modelling, and user-list rendering into focused extension modules.
+
 ## [1.0.4] - 2026-07-28
 
 GNOME extension metadata version: 23.
@@ -132,3 +149,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.2]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.2
 [1.0.3]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.3
 [1.0.4]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.4
+[1.0.5]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.5

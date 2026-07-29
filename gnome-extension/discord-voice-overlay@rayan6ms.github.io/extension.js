@@ -4,7 +4,6 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
-import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
@@ -17,7 +16,17 @@ import {
     monitorForPoint,
 } from './geometry.js';
 import {EditHistory} from './edit-history.js';
-import {parseState} from './state.js';
+import {
+    parseState,
+    stateExpiryDelay,
+} from './state.js';
+import {StateMonitor} from './state-monitor.js';
+import {UserListRenderer} from './user-list.js';
+import {
+    focusedWindowIdentity,
+    listOpenApplicationsJson,
+    windowIdentityCandidates,
+} from './window-identity.js';
 
 
 const AVATAR_SIZE_MIN = 20;
@@ -36,14 +45,13 @@ const OVERLAY_MARGIN = 8;
 const PALETTE_GAP = 12;
 const OVERLAY_HANDLE_GAP = 4;
 
-const POLL_INTERVAL_MS = 100;
 const KEYBINDING_NAME = 'toggle-edit-mode';
 const CANCEL_EDIT_KEYBINDING = 'cancel-edit';
 const UNDO_EDIT_KEYBINDING = 'undo-edit';
 const REDO_EDIT_KEYBINDING = 'redo-edit';
 const EDIT_HISTORY_LIMIT = 100;
 const DRAG_WATCHDOG_MS = 100;
-const EXTENSION_VERSION = 23;
+const EXTENSION_VERSION = 24;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -65,10 +73,6 @@ const IDENTITY_DBUS_XML = `
 </node>`;
 
 
-/*
- * Mask the final avatar texture rather than attempting to round a
- * rectangular child clip. The smooth edge provides light antialiasing.
- */
 function runtimeStatePath() {
     const runtimeDir = GLib.getenv('XDG_RUNTIME_DIR');
 
@@ -82,600 +86,6 @@ function runtimeStatePath() {
     ]);
 }
 
-
-function clearChildren(actor) {
-    for (const child of actor.get_children())
-        child.destroy();
-}
-
-
-function cleanIdentifier(value) {
-    if (typeof value !== 'string')
-        return '';
-
-    return value.trim();
-}
-
-
-function optionalCall(object, methodName) {
-    try {
-        const method = object?.[methodName];
-
-        if (typeof method !== 'function')
-            return null;
-
-        return method.call(object);
-    } catch {
-        /*
-         * A single unusual or disappearing MetaWindow must not break
-         * focus matching or the entire application picker.
-         */
-        return null;
-    }
-}
-
-
-/*
- * Keep application picking and focus matching on the exact same set of
- * identifiers. The first value is the preferred display identifier, while
- * every value is added when an application is enabled from Preferences.
- */
-function windowIdentityCandidates(window) {
-    if (!window)
-        return [];
-
-    const values = [
-        optionalCall(window, 'get_wm_class'),
-        optionalCall(window, 'get_wm_class_instance'),
-        optionalCall(window, 'get_gtk_application_id'),
-        optionalCall(window, 'get_sandboxed_app_id'),
-    ];
-
-    return [
-        ...new Set(
-            values
-                .map(cleanIdentifier)
-                .filter(value => value.length > 0)
-        ),
-    ];
-}
-
-
-function focusedWindowIdentity() {
-    return (
-        windowIdentityCandidates(
-            global.display.focus_window
-        )[0]
-        ?? ''
-    );
-}
-
-
-function openWindows() {
-    const windows = [];
-    const seen = new Set();
-
-    const addWindow = window => {
-        if (
-            !window
-            || seen.has(window)
-        ) {
-            return;
-        }
-
-        seen.add(window);
-        windows.push(window);
-    };
-
-    try {
-        for (
-            const window
-            of global.display.list_all_windows()
-        ) {
-            addWindow(window);
-        }
-    } catch (error) {
-        console.error(
-            '[DiscordVoiceOverlay] Could not list Meta windows:',
-            error
-        );
-    }
-
-    /*
-     * Keep a compositor-actor fallback for Shell/Mutter revisions where
-     * a newly mapped window has not yet appeared in list_all_windows().
-     */
-    try {
-        for (
-            const actor
-            of global.get_window_actors?.() ?? []
-        ) {
-            addWindow(
-                actor.meta_window
-                ?? actor.get_meta_window?.()
-            );
-        }
-    } catch (error) {
-        console.error(
-            '[DiscordVoiceOverlay] Could not list window actors:',
-            error
-        );
-    }
-
-    return windows;
-}
-
-
-function listOpenApplicationsJson() {
-    const tracker =
-        Shell.WindowTracker.get_default();
-
-    const applications = new Map();
-    const windows = openWindows();
-
-    const visibleWindowTypes = new Set([
-        Meta.WindowType.NORMAL,
-        Meta.WindowType.DIALOG,
-        Meta.WindowType.MODAL_DIALOG,
-        Meta.WindowType.UTILITY,
-    ]);
-
-    let eligibleWindowCount = 0;
-
-    for (const window of windows) {
-        if (
-            !window
-            || optionalCall(
-                window,
-                'is_override_redirect'
-            )
-        ) {
-            continue;
-        }
-
-        const windowType =
-            optionalCall(
-                window,
-                'get_window_type'
-            );
-
-        if (
-            windowType !== undefined
-            && windowType !== null
-            && !visibleWindowTypes.has(windowType)
-        ) {
-            continue;
-        }
-
-        const identifiers =
-            windowIdentityCandidates(window);
-
-        if (identifiers.length === 0)
-            continue;
-
-        eligibleWindowCount += 1;
-
-        let app = null;
-
-        try {
-            app =
-                tracker.get_window_app(window);
-        } catch {
-            /*
-             * Keep the window pickable by its Meta identifiers even if
-             * Shell cannot associate it with a desktop application.
-             */
-        }
-
-        const rawDesktopId =
-            cleanIdentifier(
-                optionalCall(app, 'get_id')
-            );
-
-        /*
-         * Shell uses transient window:<id> identifiers for applications
-         * without a desktop file. They are useful as grouping keys only,
-         * not as persistent application metadata.
-         */
-        const desktopId =
-            rawDesktopId.startsWith('window:')
-                ? ''
-                : rawDesktopId;
-
-        const title =
-            cleanIdentifier(
-                optionalCall(window, 'get_title')
-            );
-
-        const name =
-            cleanIdentifier(
-                optionalCall(app, 'get_name')
-            )
-            || title
-            || identifiers[0];
-
-        const key =
-            desktopId
-            || identifiers[0];
-
-        let entry = applications.get(key);
-
-        if (!entry) {
-            entry = {
-                name,
-                desktopId,
-                identifiers: [],
-                titles: [],
-                windowCount: 0,
-            };
-
-            applications.set(key, entry);
-        }
-
-        entry.windowCount += 1;
-
-        for (const identifier of identifiers) {
-            if (!entry.identifiers.includes(identifier))
-                entry.identifiers.push(identifier);
-        }
-
-        if (
-            title
-            && !entry.titles.includes(title)
-            && entry.titles.length < 3
-        ) {
-            entry.titles.push(title);
-        }
-    }
-
-    const sortedApplications = [
-        ...applications.values(),
-    ].sort(
-        (left, right) =>
-            left.name.localeCompare(right.name)
-            || left.identifiers[0]
-                .localeCompare(right.identifiers[0])
-    );
-
-    return JSON.stringify({
-        protocolVersion: APPLICATION_PICKER_PROTOCOL_VERSION,
-        extensionVersion: EXTENSION_VERSION,
-        totalWindowCount: windows.length,
-        eligibleWindowCount,
-        applications: sortedApplications,
-    });
-}
-
-function avatarCssUrl(value) {
-    let uri = String(value);
-
-    /*
-     * This accepts the current Discord CDN URLs and also supports
-     * ordinary local paths if the bridge later caches avatars.
-     */
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(uri))
-        uri = Gio.File.new_for_path(uri).get_uri();
-
-    return uri
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/[\r\n]/g, '');
-}
-
-
-function avatarActor(url, avatarSize) {
-    if (url) {
-        try {
-            const actor = new St.Bin({
-                style_class: 'dvo-avatar-image',
-                reactive: false,
-                can_focus: false,
-                x_align: Clutter.ActorAlign.CENTER,
-                y_align: Clutter.ActorAlign.CENTER,
-
-                /*
-                 * Because this image is the actor's own themed
-                 * background, St applies border-radius directly to
-                 * the image instead of merely rounding a parent.
-                 */
-                style: `background-image: url("${avatarCssUrl(url)}");`,
-            });
-
-            actor.set_size(
-                avatarSize,
-                avatarSize
-            );
-
-            return actor;
-        } catch (error) {
-            console.error(
-                '[DiscordVoiceOverlay] Avatar creation failed:',
-                error
-            );
-        }
-    }
-
-    return new St.Icon({
-        icon_name: 'avatar-default-symbolic',
-        icon_size: avatarSize,
-        style_class: 'dvo-avatar-fallback',
-    });
-}
-
-
-function createStatusIcon(gicon, styleClass) {
-    return new St.Icon({
-        gicon,
-        icon_size: 12,
-        style_class: `dvo-status-icon ${styleClass}`,
-        reactive: false,
-        can_focus: false,
-        y_align: Clutter.ActorAlign.CENTER,
-    });
-}
-
-
-function cleanDisplayName(user) {
-    const value =
-        user?.name
-        ?? user?.username
-        ?? 'Unknown';
-
-    const cleaned =
-        String(value)
-            .replace(/[\r\n\t]+/g, ' ')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-
-    return cleaned || 'Unknown';
-}
-
-
-function createUserRow(
-    user,
-    avatarSize,
-    speakingOnly,
-    ringInside,
-    nameMaxWidth,
-    anchorRight,
-    statusIcons
-) {
-    const avatarOuterSize =
-        ringInside
-            ? avatarSize
-            : avatarSize + 6;
-
-    const namePlateHeight = 24;
-
-    const rowHeight =
-        Math.max(
-            avatarOuterSize,
-            namePlateHeight
-        );
-
-    const row = new St.BoxLayout({
-        style_class:
-            anchorRight
-                ? 'dvo-user-row dvo-user-row-right'
-                : 'dvo-user-row',
-
-        vertical: false,
-        x_expand: true,
-        x_align: Clutter.ActorAlign.FILL,
-        reactive: false,
-        can_focus: false,
-        height: rowHeight,
-    });
-
-
-    let avatarContainer;
-
-    if (ringInside) {
-        const avatarStack = new St.Widget({
-            style_class: 'dvo-avatar-stack',
-            layout_manager: new Clutter.BinLayout(),
-            width: avatarSize,
-            height: avatarSize,
-            reactive: false,
-            can_focus: false,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-
-        const avatar =
-            avatarActor(
-                user.avatar,
-                avatarSize
-            );
-
-        avatar.x_align =
-            Clutter.ActorAlign.CENTER;
-
-        avatar.y_align =
-            Clutter.ActorAlign.CENTER;
-
-        avatarStack.add_child(avatar);
-
-        if (user.speaking) {
-            avatarStack.add_child(
-                new St.Widget({
-                    style_class:
-                        'dvo-avatar-ring-inside',
-
-                    width: avatarSize,
-                    height: avatarSize,
-                    reactive: false,
-                    can_focus: false,
-                    x_align:
-                        Clutter.ActorAlign.CENTER,
-                    y_align:
-                        Clutter.ActorAlign.CENTER,
-                })
-            );
-        }
-
-        avatarContainer = avatarStack;
-    } else {
-        const avatarFrame = new St.Bin({
-            style_class:
-                user.speaking
-                    ? 'dvo-avatar-frame dvo-avatar-frame-speaking'
-                    : 'dvo-avatar-frame',
-
-            reactive: false,
-            can_focus: false,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-
-        avatarFrame.set_child(
-            avatarActor(
-                user.avatar,
-                avatarSize
-            )
-        );
-
-        avatarContainer = avatarFrame;
-    }
-
-
-    let plateOpacity = 255;
-
-    if (!user.speaking) {
-        plateOpacity =
-            user.muted || user.deafened
-                ? 150
-                : 185;
-    }
-
-
-    const namePlate = new St.BoxLayout({
-        style_class: 'dvo-name-plate',
-        vertical: false,
-        reactive: false,
-        can_focus: false,
-        opacity: plateOpacity,
-        height: namePlateHeight,
-        y_align: Clutter.ActorAlign.CENTER,
-    });
-
-
-    const displayName =
-        cleanDisplayName(user);
-
-    const name = new St.Label({
-        text: displayName,
-        style_class: 'dvo-name',
-        style: `max-width: ${nameMaxWidth}px;`,
-        reactive: false,
-        can_focus: false,
-        y_align: Clutter.ActorAlign.CENTER,
-    });
-
-    name.set_accessible_name(displayName);
-
-    name.clutter_text.set_single_line_mode(true);
-
-    name.clutter_text.set_ellipsize(
-        Pango.EllipsizeMode.END
-    );
-
-    name.clutter_text.set_line_alignment(
-        anchorRight
-            ? Pango.Alignment.RIGHT
-            : Pango.Alignment.LEFT
-    );
-
-    const decorations = [];
-
-    const userIsLive =
-        Boolean(
-            user.live
-            ?? user.streaming
-        );
-
-    if (userIsLive) {
-        decorations.push(
-            new St.Label({
-                text: 'LIVE',
-                style_class: 'dvo-live-badge',
-                reactive: false,
-                can_focus: false,
-                y_align: Clutter.ActorAlign.CENTER,
-            })
-        );
-    }
-
-    if (!speakingOnly) {
-        if (user.muted && statusIcons?.muted) {
-            decorations.push(
-                createStatusIcon(
-                    statusIcons.muted,
-                    'dvo-status-muted'
-                )
-            );
-        }
-
-        if (user.deafened && statusIcons?.deafened) {
-            decorations.push(
-                createStatusIcon(
-                    statusIcons.deafened,
-                    'dvo-status-deafened'
-                )
-            );
-        }
-    }
-
-
-    /*
-     * Keep the name adjacent to the avatar in either orientation.
-     *
-     * Left side:
-     *   avatar | name decorations
-     *
-     * Right side:
-     *   decorations name | avatar
-     */
-    if (anchorRight) {
-        /*
-         * Every row is allocated to the width of the widest row. Let a
-         * leading spacer absorb the difference so all avatars share the
-         * same right edge regardless of display-name length.
-         */
-        row.add_child(
-            new St.Widget({
-                x_expand: true,
-                reactive: false,
-                can_focus: false,
-            })
-        );
-
-        for (const decoration of decorations)
-            namePlate.add_child(decoration);
-
-        namePlate.add_child(name);
-
-        row.add_child(namePlate);
-        row.add_child(avatarContainer);
-    } else {
-        namePlate.add_child(name);
-
-        for (const decoration of decorations)
-            namePlate.add_child(decoration);
-
-        row.add_child(avatarContainer);
-        row.add_child(namePlate);
-
-        row.add_child(
-            new St.Widget({
-                x_expand: true,
-                reactive: false,
-                can_focus: false,
-            })
-        );
-    }
-
-    return row;
-}
 
 
 export default class DiscordVoiceOverlay extends Extension {
@@ -712,7 +122,10 @@ export default class DiscordVoiceOverlay extends Extension {
                     },
 
                     ListOpenApplications() {
-                        return listOpenApplicationsJson();
+                        return listOpenApplicationsJson(
+                            APPLICATION_PICKER_PROTOCOL_VERSION,
+                            EXTENSION_VERSION
+                        );
                     },
                 }
             );
@@ -723,6 +136,9 @@ export default class DiscordVoiceOverlay extends Extension {
         );
 
         this._statePath = runtimeStatePath();
+        this._stateMonitor = null;
+        this._stateExpiryId = null;
+        this._userListRenderer = null;
 
         this._editMode = false;
         this._editHistory = null;
@@ -747,7 +163,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._positionIdleId = null;
 
-        this._lastRawState = null;
         this._lastRenderKey = null;
 
         this._keybindingRegistered = false;
@@ -765,6 +180,13 @@ export default class DiscordVoiceOverlay extends Extension {
         this._settingsSignalIds = [];
 
         this._buildUi();
+        this._userListRenderer =
+            new UserListRenderer(
+                this._userList,
+                this._statusIcons,
+                () =>
+                    this._schedulePositionRefresh()
+            );
 
         this._monitorsChangedId =
             Main.layoutManager.connect(
@@ -885,14 +307,15 @@ export default class DiscordVoiceOverlay extends Extension {
         this._syncUnredirect();
         this._syncKeybinding();
 
-        this._timerId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT,
-            POLL_INTERVAL_MS,
-            () => {
-                this._tick(false);
-                return GLib.SOURCE_CONTINUE;
-            }
-        );
+        if (this._statePath) {
+            this._stateMonitor =
+                new StateMonitor(
+                    this._statePath,
+                    () => this._tick(false)
+                );
+
+            this._stateMonitor.start();
+        }
 
         this._tick(true);
     }
@@ -920,9 +343,17 @@ export default class DiscordVoiceOverlay extends Extension {
             this._keybindingRegistered = false;
         }
 
-        if (this._timerId) {
-            GLib.source_remove(this._timerId);
-            this._timerId = null;
+        if (this._stateMonitor) {
+            this._stateMonitor.stop();
+            this._stateMonitor = null;
+        }
+
+        if (this._stateExpiryId) {
+            GLib.source_remove(
+                this._stateExpiryId
+            );
+
+            this._stateExpiryId = null;
         }
 
         if (this._positionIdleId) {
@@ -955,6 +386,11 @@ export default class DiscordVoiceOverlay extends Extension {
         }
 
         this._settingsSignalIds = [];
+
+        if (this._userListRenderer) {
+            this._userListRenderer.destroy();
+            this._userListRenderer = null;
+        }
 
         if (this._root) {
             Main.layoutManager.removeChrome(
@@ -1013,6 +449,9 @@ export default class DiscordVoiceOverlay extends Extension {
         this._settings = null;
         this._statusIcons = null;
         this._statePath = null;
+        this._stateMonitor = null;
+        this._stateExpiryId = null;
+        this._userListRenderer = null;
 
         this._editMode = false;
         this._editHistory = null;
@@ -1047,6 +486,8 @@ export default class DiscordVoiceOverlay extends Extension {
                 if (this._root !== actor)
                     return;
 
+                this._userListRenderer?.abandon();
+                this._userListRenderer = null;
                 this._root = null;
                 this._userList = null;
             }
@@ -3127,6 +2568,38 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
+    _scheduleStateExpiry(raw) {
+        if (this._stateExpiryId) {
+            GLib.source_remove(
+                this._stateExpiryId
+            );
+
+            this._stateExpiryId = null;
+        }
+
+        const delay =
+            stateExpiryDelay(raw);
+
+        if (
+            delay === null
+            || delay <= 0
+        ) {
+            return;
+        }
+
+        this._stateExpiryId =
+            GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                delay,
+                () => {
+                    this._stateExpiryId = null;
+                    this._tick(false);
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+    }
+
+
     _tick(force) {
         if (!this._root)
             return;
@@ -3139,6 +2612,7 @@ export default class DiscordVoiceOverlay extends Extension {
         );
 
         if (!gameWindow) {
+            this._scheduleStateExpiry(null);
             this._root.hide();
 
             if (this._toolbar)
@@ -3160,6 +2634,8 @@ export default class DiscordVoiceOverlay extends Extension {
 
         const raw =
             this._readRawState();
+
+        this._scheduleStateExpiry(raw);
 
         const state = parseState(raw);
 
@@ -3229,20 +2705,30 @@ export default class DiscordVoiceOverlay extends Extension {
             force
             || renderKey !== this._lastRenderKey
         ) {
-            this._lastRawState = raw;
             this._lastRenderKey = renderKey;
 
-            this._rebuildUserList(
-                state,
+            const monitor =
+                this._monitorForActor(
+                    this._root
+                )
+                ?? this._focusedMonitor();
+
+            this._userListRenderer?.render({
                 users,
+                stateConnected:
+                    Boolean(state.connected),
                 overlayEnabled,
+                editMode: this._editMode,
                 speakingOnly,
                 ringInside,
                 avatarSize,
                 nameMaxWidth,
                 maxVisibleUsers,
-                anchorRight
-            );
+                anchorRight,
+                monitor,
+                overlayMargin:
+                    OVERLAY_MARGIN,
+            });
         }
 
 
@@ -3263,197 +2749,5 @@ export default class DiscordVoiceOverlay extends Extension {
             this._root.show();
         else
             this._root.hide();
-    }
-
-
-    _rebuildUserList(
-        state,
-        users,
-        overlayEnabled,
-        speakingOnly,
-        ringInside,
-        avatarSize,
-        nameMaxWidth,
-        maxVisibleUsers,
-        anchorRight
-    ) {
-        clearChildren(
-            this._userList
-        );
-
-        if (!overlayEnabled) {
-            if (this._editMode) {
-                this._userList.add_child(
-                    new St.Label({
-                        text: 'Overlay hidden',
-                        style_class: 'dvo-placeholder',
-                        reactive: false,
-                    })
-                );
-            }
-
-            this._schedulePositionRefresh();
-            return;
-        }
-
-
-        const monitor =
-            this._monitorForActor(this._root)
-            ?? this._focusedMonitor();
-
-        const avatarOuterSize =
-            ringInside
-                ? avatarSize
-                : avatarSize + 6;
-
-        const estimatedRowHeight =
-            Math.max(
-                avatarOuterSize,
-                24
-            ) + 4;
-
-        const rowsByHeight =
-            monitor
-                ? Math.max(
-                    2,
-                    Math.floor(
-                        (
-                            monitor.height
-                            - OVERLAY_MARGIN * 2
-                            - 28
-                        )
-                        / estimatedRowHeight
-                    )
-                )
-                : maxVisibleUsers;
-
-        const preliminaryLimit =
-            Math.min(
-                maxVisibleUsers,
-                rowsByHeight,
-                users.length
-            );
-
-        const overflowNeeded =
-            users.length
-            > preliminaryLimit;
-
-        const visibleLimit =
-            overflowNeeded
-                ? Math.max(
-                    1,
-                    Math.min(
-                        preliminaryLimit,
-                        rowsByHeight - 1
-                    )
-                )
-                : preliminaryLimit;
-
-        const visibleUsers =
-            users.slice(
-                0,
-                visibleLimit
-            );
-
-        const hiddenCount =
-            Math.max(
-                0,
-                users.length
-                - visibleUsers.length
-            );
-
-
-        for (const user of visibleUsers) {
-            this._userList.add_child(
-                createUserRow(
-                    user,
-                    avatarSize,
-                    speakingOnly,
-                    ringInside,
-                    nameMaxWidth,
-                    anchorRight,
-                    this._statusIcons
-                )
-            );
-        }
-
-
-        if (hiddenCount > 0) {
-            const overflowRow =
-                new St.BoxLayout({
-                    vertical: false,
-                    x_expand: true,
-                    x_align:
-                        Clutter.ActorAlign.FILL,
-                    reactive: false,
-                    can_focus: false,
-                });
-
-            const overflowLabel =
-                new St.Label({
-                    text:
-                        `+${hiddenCount} more`,
-
-                    style_class:
-                        anchorRight
-                            ? 'dvo-overflow dvo-overflow-right'
-                            : 'dvo-overflow',
-
-                    reactive: false,
-                    can_focus: false,
-                });
-
-            const spacer =
-                new St.Widget({
-                    x_expand: true,
-                    reactive: false,
-                    can_focus: false,
-                });
-
-            if (anchorRight) {
-                overflowRow.add_child(spacer);
-                overflowRow.add_child(overflowLabel);
-            } else {
-                overflowRow.add_child(overflowLabel);
-                overflowRow.add_child(spacer);
-            }
-
-            this._userList.add_child(
-                overflowRow
-            );
-        }
-
-
-        if (
-            users.length === 0
-            && this._editMode
-        ) {
-            let message;
-
-            if (state.connected && speakingOnly) {
-                this._schedulePositionRefresh();
-                return;
-            }
-
-            if (!state.connected)
-                message = 'Discord voice: disconnected';
-            else
-                message = 'No voice users';
-
-            this._userList.add_child(
-                new St.Label({
-                    text: message,
-                    style_class: 'dvo-placeholder',
-                    reactive: false,
-                })
-            );
-        }
-
-        /*
-         * Width can change after a user joins, leaves, changes name,
-         * starts streaming or changes status. Reapply the saved anchor
-         * after Clutter recalculates the actor's preferred size.
-         */
-        this._schedulePositionRefresh();
     }
 }

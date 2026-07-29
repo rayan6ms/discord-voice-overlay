@@ -55,7 +55,11 @@ if command -v gnome-extensions >/dev/null 2>&1; then
             --out-dir "$TEMP_DIR" \
             --extra-source=edit-history.js \
             --extra-source=geometry.js \
+            --extra-source=render-model.js \
             --extra-source=state.js \
+            --extra-source=state-monitor.js \
+            --extra-source=user-list.js \
+            --extra-source=window-identity.js \
             .
         zip -X -q "$PACKED_ARCHIVE" \
             COPYING \
@@ -91,7 +95,11 @@ required = {
     "extension.js",
     "edit-history.js",
     "geometry.js",
+    "render-model.js",
     "state.js",
+    "state-monitor.js",
+    "user-list.js",
+    "window-identity.js",
     "COPYING",
     "metadata.json",
     "prefs.js",

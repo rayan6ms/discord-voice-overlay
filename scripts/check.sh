@@ -20,15 +20,22 @@ require_command() {
 require_command node
 require_command python3
 require_command rg
+require_command gjs
 
 node --check "$EXTENSION_DIR/extension.js"
 node --check "$EXTENSION_DIR/edit-history.js"
 node --check "$EXTENSION_DIR/geometry.js"
 node --check "$EXTENSION_DIR/prefs.js"
+node --check "$EXTENSION_DIR/render-model.js"
 node --check "$EXTENSION_DIR/state.js"
+node --check "$EXTENSION_DIR/state-monitor.js"
+node --check "$EXTENSION_DIR/user-list.js"
+node --check "$EXTENSION_DIR/window-identity.js"
 node "$SCRIPT_DIR/test-geometry.mjs"
 node "$SCRIPT_DIR/test-edit-history.mjs"
+node "$SCRIPT_DIR/test-render-model.mjs"
 node "$SCRIPT_DIR/test-state.mjs"
+gjs -m "$SCRIPT_DIR/test-state-monitor.js"
 python3 -m json.tool "$METADATA" >/dev/null
 
 if command -v glib-compile-schemas >/dev/null 2>&1; then
