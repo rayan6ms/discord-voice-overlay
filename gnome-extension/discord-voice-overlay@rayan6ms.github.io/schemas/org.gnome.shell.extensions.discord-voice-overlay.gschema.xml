@@ -10,6 +10,21 @@
       <summary>Toggle overlay edit mode</summary>
     </key>
 
+    <key name="cancel-edit" type="as">
+      <default>['Escape']</default>
+      <summary>Discard the current edit session</summary>
+    </key>
+
+    <key name="undo-edit" type="as">
+      <default>['&lt;Control&gt;z']</default>
+      <summary>Undo the last overlay edit</summary>
+    </key>
+
+    <key name="redo-edit" type="as">
+      <default>['&lt;Control&gt;y', '&lt;Control&gt;&lt;Shift&gt;z']</default>
+      <summary>Redo the last undone overlay edit</summary>
+    </key>
+
     <key name="overlay-enabled" type="b">
       <default>true</default>
       <summary>Whether voice users are displayed</summary>

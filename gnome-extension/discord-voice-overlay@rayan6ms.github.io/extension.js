@@ -16,6 +16,7 @@ import {
     fitRectToMonitor,
     monitorForPoint,
 } from './geometry.js';
+import {EditHistory} from './edit-history.js';
 import {parseState} from './state.js';
 
 
@@ -37,7 +38,12 @@ const OVERLAY_HANDLE_GAP = 4;
 
 const POLL_INTERVAL_MS = 100;
 const KEYBINDING_NAME = 'toggle-edit-mode';
-const EXTENSION_VERSION = 22;
+const CANCEL_EDIT_KEYBINDING = 'cancel-edit';
+const UNDO_EDIT_KEYBINDING = 'undo-edit';
+const REDO_EDIT_KEYBINDING = 'redo-edit';
+const EDIT_HISTORY_LIMIT = 100;
+const DRAG_WATCHDOG_MS = 100;
+const EXTENSION_VERSION = 23;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const IDENTITY_DBUS_PATH =
@@ -559,6 +565,7 @@ function createUserRow(
     const name = new St.Label({
         text: displayName,
         style_class: 'dvo-name',
+        style: `max-width: ${nameMaxWidth}px;`,
         reactive: false,
         can_focus: false,
         y_align: Clutter.ActorAlign.CENTER,
@@ -577,24 +584,6 @@ function createUserRow(
             ? Pango.Alignment.RIGHT
             : Pango.Alignment.LEFT
     );
-
-    /*
-     * Leave short names at natural width. Constrain only names that
-     * exceed the configured limit, enabling Pango end ellipsization.
-     */
-    const preferredWidth =
-        name.get_preferred_width(-1);
-
-    const naturalWidth =
-        Number(preferredWidth?.[1]) || 0;
-
-    if (
-        naturalWidth <= 0
-        || naturalWidth > nameMaxWidth
-    ) {
-        name.width = nameMaxWidth;
-    }
-
 
     const decorations = [];
 
@@ -736,6 +725,9 @@ export default class DiscordVoiceOverlay extends Extension {
         this._statePath = runtimeStatePath();
 
         this._editMode = false;
+        this._editHistory = null;
+        this._applyingEditState = false;
+        this._editKeybindings = new Set();
         this._dragging = false;
 
         /*
@@ -747,6 +739,7 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragTarget = null;
         this._dragKind = null;
         this._dragGrab = null;
+        this._dragWatchdogId = null;
         this._dragPointerStartX = 0;
         this._dragPointerStartY = 0;
         this._dragTargetStartX = 0;
@@ -780,11 +773,6 @@ export default class DiscordVoiceOverlay extends Extension {
                     this._schedulePositionRefresh();
                 }
             );
-
-        this._stageEventId = global.stage.connect(
-            'captured-event',
-            (_actor, event) => this._onStageEvent(event)
-        );
 
         this._focusWindowId = global.display.connect(
             'notify::focus-window',
@@ -831,6 +819,9 @@ export default class DiscordVoiceOverlay extends Extension {
                 this._settings.connect(
                     `changed::${key}`,
                     () => {
+                        if (this._applyingEditState)
+                            return;
+
                         const positionKeys = [
                             'position-x',
                             'position-y',
@@ -919,6 +910,7 @@ export default class DiscordVoiceOverlay extends Extension {
          * event handler is destroyed.
          */
         this._cancelDrag(false);
+        this._removeEditKeybindings();
 
         if (this._keybindingRegistered) {
             Main.wm.removeKeybinding(
@@ -947,14 +939,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
 
             this._monitorsChangedId = null;
-        }
-
-        if (this._stageEventId) {
-            global.stage.disconnect(
-                this._stageEventId
-            );
-
-            this._stageEventId = null;
         }
 
         if (this._focusWindowId) {
@@ -1031,10 +1015,14 @@ export default class DiscordVoiceOverlay extends Extension {
         this._statePath = null;
 
         this._editMode = false;
+        this._editHistory = null;
+        this._applyingEditState = false;
+        this._editKeybindings = null;
         this._dragging = false;
         this._dragTarget = null;
         this._dragKind = null;
         this._dragGrab = null;
+        this._dragWatchdogId = null;
         this._dragPointerStartX = 0;
         this._dragPointerStartY = 0;
         this._dragTargetStartX = 0;
@@ -1053,6 +1041,17 @@ export default class DiscordVoiceOverlay extends Extension {
             visible: false,
         });
 
+        this._root.connect(
+            'destroy',
+            actor => {
+                if (this._root !== actor)
+                    return;
+
+                this._root = null;
+                this._userList = null;
+            }
+        );
+
         this._applySavedPosition();
 
 
@@ -1066,6 +1065,17 @@ export default class DiscordVoiceOverlay extends Extension {
 
             visible: false,
         });
+
+        this._toolbar.connect(
+            'destroy',
+            actor => {
+                if (this._toolbar !== actor)
+                    return;
+
+                this._toolbar = null;
+                this._dragHandle = null;
+            }
+        );
 
 
         this._dragHandle = new St.BoxLayout({
@@ -1099,6 +1109,18 @@ export default class DiscordVoiceOverlay extends Extension {
                 )
         );
 
+        this._dragHandle.connect(
+            'motion-event',
+            (_actor, event) =>
+                this._onDragMotion(event)
+        );
+
+        this._dragHandle.connect(
+            'button-release-event',
+            (_actor, event) =>
+                this._onDragRelease(event)
+        );
+
 
         this._overlayButton = new St.Button({
             style_class: 'dvo-control-button',
@@ -1111,17 +1133,17 @@ export default class DiscordVoiceOverlay extends Extension {
         this._overlayButton.connect(
             'clicked',
             () => {
-                const value =
-                    !this._settings.get_boolean(
-                        'overlay-enabled'
+                this._performEdit(() => {
+                    const value =
+                        !this._settings.get_boolean(
+                            'overlay-enabled'
+                        );
+
+                    this._settings.set_boolean(
+                        'overlay-enabled',
+                        value
                     );
-
-                this._settings.set_boolean(
-                    'overlay-enabled',
-                    value
-                );
-
-                this._refreshControls();
+                });
             }
         );
 
@@ -1137,17 +1159,17 @@ export default class DiscordVoiceOverlay extends Extension {
         this._speakingButton.connect(
             'clicked',
             () => {
-                const value =
-                    !this._settings.get_boolean(
-                        'speaking-only'
+                this._performEdit(() => {
+                    const value =
+                        !this._settings.get_boolean(
+                            'speaking-only'
+                        );
+
+                    this._settings.set_boolean(
+                        'speaking-only',
+                        value
                     );
-
-                this._settings.set_boolean(
-                    'speaking-only',
-                    value
-                );
-
-                this._refreshControls();
+                });
             }
         );
 
@@ -1163,15 +1185,17 @@ export default class DiscordVoiceOverlay extends Extension {
         this._ringButton.connect(
             'clicked',
             () => {
-                const current =
-                    this._settings.get_boolean(
-                        'ring-inside'
-                    );
+                this._performEdit(() => {
+                    const current =
+                        this._settings.get_boolean(
+                            'ring-inside'
+                        );
 
-                this._settings.set_boolean(
-                    'ring-inside',
-                    !current
-                );
+                    this._settings.set_boolean(
+                        'ring-inside',
+                        !current
+                    );
+                });
             }
         );
 
@@ -1417,6 +1441,20 @@ export default class DiscordVoiceOverlay extends Extension {
             visible: false,
         });
 
+        this._overlayDragHandle.connect(
+            'destroy',
+            actor => {
+                if (
+                    this._overlayDragHandle
+                    !== actor
+                ) {
+                    return;
+                }
+
+                this._overlayDragHandle = null;
+            }
+        );
+
         this._overlayDragHandle.add_child(
             new St.Label({
                 text: '⠿ Voice overlay',
@@ -1434,6 +1472,18 @@ export default class DiscordVoiceOverlay extends Extension {
                     'overlay',
                     actor
                 )
+        );
+
+        this._overlayDragHandle.connect(
+            'motion-event',
+            (_actor, event) =>
+                this._onDragMotion(event)
+        );
+
+        this._overlayDragHandle.connect(
+            'button-release-event',
+            (_actor, event) =>
+                this._onDragRelease(event)
         );
 
 
@@ -1641,8 +1691,287 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
-    _setEditMode(enabled) {
+    _captureEditState() {
+        return {
+            overlayEnabled:
+                this._settings.get_boolean(
+                    'overlay-enabled'
+                ),
+
+            speakingOnly:
+                this._settings.get_boolean(
+                    'speaking-only'
+                ),
+
+            ringInside:
+                this._settings.get_boolean(
+                    'ring-inside'
+                ),
+
+            avatarSize:
+                this._settings.get_int(
+                    'avatar-size'
+                ),
+
+            nameMaxWidth:
+                this._settings.get_int(
+                    'name-max-width'
+                ),
+
+            maxVisibleUsers:
+                this._settings.get_int(
+                    'max-visible-users'
+                ),
+
+            positionX:
+                this._settings.get_int(
+                    'position-x'
+                ),
+
+            positionY:
+                this._settings.get_int(
+                    'position-y'
+                ),
+
+            positionGlobal:
+                this._settings.get_boolean(
+                    'position-global'
+                ),
+
+            anchorRight:
+                this._settings.get_boolean(
+                    'anchor-right'
+                ),
+
+            palettePositionX:
+                this._settings.get_int(
+                    'palette-position-x'
+                ),
+
+            palettePositionY:
+                this._settings.get_int(
+                    'palette-position-y'
+                ),
+
+            palettePositionSet:
+                this._settings.get_boolean(
+                    'palette-position-set'
+                ),
+        };
+    }
+
+
+    _applyEditState(snapshot) {
+        if (!this._settings || !snapshot)
+            return;
+
+        this._applyingEditState = true;
+        this._savingPosition = true;
+
+        try {
+            this._settings.set_boolean(
+                'overlay-enabled',
+                snapshot.overlayEnabled
+            );
+
+            this._settings.set_boolean(
+                'speaking-only',
+                snapshot.speakingOnly
+            );
+
+            this._settings.set_boolean(
+                'ring-inside',
+                snapshot.ringInside
+            );
+
+            this._settings.set_int(
+                'avatar-size',
+                snapshot.avatarSize
+            );
+
+            this._settings.set_int(
+                'name-max-width',
+                snapshot.nameMaxWidth
+            );
+
+            this._settings.set_int(
+                'max-visible-users',
+                snapshot.maxVisibleUsers
+            );
+
+            this._settings.set_int(
+                'position-x',
+                snapshot.positionX
+            );
+
+            this._settings.set_int(
+                'position-y',
+                snapshot.positionY
+            );
+
+            this._settings.set_boolean(
+                'position-global',
+                snapshot.positionGlobal
+            );
+
+            this._settings.set_boolean(
+                'anchor-right',
+                snapshot.anchorRight
+            );
+
+            this._settings.set_int(
+                'palette-position-x',
+                snapshot.palettePositionX
+            );
+
+            this._settings.set_int(
+                'palette-position-y',
+                snapshot.palettePositionY
+            );
+
+            this._settings.set_boolean(
+                'palette-position-set',
+                snapshot.palettePositionSet
+            );
+        } finally {
+            this._savingPosition = false;
+            this._applyingEditState = false;
+        }
+
+        this._applySavedPosition();
+        this._applyPalettePosition();
+        this._refreshControls();
+
+        this._lastRenderKey = null;
+        this._tick(true);
+
+        if (this._editMode)
+            this._placeOverlayDragHandle();
+    }
+
+
+    _performEdit(callback) {
+        callback();
+
+        if (this._editMode && this._editHistory) {
+            this._editHistory.record(
+                this._captureEditState()
+            );
+        }
+    }
+
+
+    _undoEdit() {
+        if (!this._editMode || !this._editHistory)
+            return;
+
+        if (this._dragging) {
+            this._cancelDrag(true);
+            return;
+        }
+
+        const snapshot =
+            this._editHistory.undo();
+
+        if (snapshot)
+            this._applyEditState(snapshot);
+    }
+
+
+    _redoEdit() {
+        if (
+            !this._editMode
+            || !this._editHistory
+            || this._dragging
+        ) {
+            return;
+        }
+
+        const snapshot =
+            this._editHistory.redo();
+
+        if (snapshot)
+            this._applyEditState(snapshot);
+    }
+
+
+    _registerEditKeybindings() {
+        if (
+            !this._settings
+            || !this._editMode
+            || !this._editKeybindings
+        ) {
+            return;
+        }
+
+        const definitions = [
+            [
+                CANCEL_EDIT_KEYBINDING,
+                () => this._setEditMode(
+                    false,
+                    true
+                ),
+            ],
+
+            [
+                UNDO_EDIT_KEYBINDING,
+                () => this._undoEdit(),
+            ],
+
+            [
+                REDO_EDIT_KEYBINDING,
+                () => this._redoEdit(),
+            ],
+        ];
+
+        for (const [name, callback] of definitions) {
+            if (this._editKeybindings.has(name))
+                continue;
+
+            try {
+                Main.wm.addKeybinding(
+                    name,
+                    this._settings,
+                    Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+                    Shell.ActionMode.NORMAL,
+                    callback
+                );
+
+                this._editKeybindings.add(name);
+            } catch (error) {
+                console.error(
+                    `[DiscordVoiceOverlay] Could not register ${name}:`,
+                    error
+                );
+            }
+        }
+    }
+
+
+    _removeEditKeybindings() {
+        if (!this._editKeybindings)
+            return;
+
+        for (const name of this._editKeybindings) {
+            try {
+                Main.wm.removeKeybinding(name);
+            } catch (error) {
+                console.error(
+                    `[DiscordVoiceOverlay] Could not remove ${name}:`,
+                    error
+                );
+            }
+        }
+
+        this._editKeybindings.clear();
+    }
+
+
+    _setEditMode(enabled, discardChanges = false) {
         enabled = Boolean(enabled);
+
+        if (enabled === this._editMode)
+            return;
 
         if (
             enabled
@@ -1652,10 +1981,33 @@ export default class DiscordVoiceOverlay extends Extension {
         }
 
 
-        if (!enabled && this._dragging)
-            this._cancelDrag(true);
+        if (enabled) {
+            this._editHistory =
+                new EditHistory(
+                    this._captureEditState(),
+                    EDIT_HISTORY_LIMIT
+                );
+        } else {
+            if (this._dragging)
+                this._cancelDrag(true);
+
+            if (
+                discardChanges
+                && this._editHistory
+            ) {
+                this._applyEditState(
+                    this._editHistory.initial()
+                );
+            }
+
+            this._removeEditKeybindings();
+            this._editHistory = null;
+        }
 
         this._editMode = enabled;
+
+        if (enabled)
+            this._registerEditKeybindings();
 
         if (this._overlayDragHandle)
             this._overlayDragHandle.visible = enabled;
@@ -1801,9 +2153,13 @@ export default class DiscordVoiceOverlay extends Extension {
             );
 
         if (next !== current) {
-            this._settings.set_int(
-                'avatar-size',
-                next
+            this._performEdit(
+                () => {
+                    this._settings.set_int(
+                        'avatar-size',
+                        next
+                    );
+                }
             );
         }
     }
@@ -1825,9 +2181,13 @@ export default class DiscordVoiceOverlay extends Extension {
             );
 
         if (next !== current) {
-            this._settings.set_int(
-                'name-max-width',
-                next
+            this._performEdit(
+                () => {
+                    this._settings.set_int(
+                        'name-max-width',
+                        next
+                    );
+                }
             );
         }
     }
@@ -1849,9 +2209,13 @@ export default class DiscordVoiceOverlay extends Extension {
             );
 
         if (next !== current) {
-            this._settings.set_int(
-                'max-visible-users',
-                next
+            this._performEdit(
+                () => {
+                    this._settings.set_int(
+                        'max-visible-users',
+                        next
+                    );
+                }
             );
         }
     }
@@ -2346,6 +2710,44 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragTargetStartY =
             target.y;
 
+        this._dragWatchdogId =
+            GLib.timeout_add(
+                GLib.PRIORITY_DEFAULT,
+                DRAG_WATCHDOG_MS,
+                () => {
+                    if (!this._dragging) {
+                        this._dragWatchdogId = null;
+                        return GLib.SOURCE_REMOVE;
+                    }
+
+                    try {
+                        const [, , modifiers] =
+                            global.get_pointer();
+
+                        if (
+                            modifiers
+                            & Clutter.ModifierType.BUTTON1_MASK
+                        ) {
+                            return GLib.SOURCE_CONTINUE;
+                        }
+                    } catch (error) {
+                        console.error(
+                            '[DiscordVoiceOverlay] Could not inspect drag input:',
+                            error
+                        );
+                    }
+
+                    /*
+                     * Never leave Shell input grabbed if a compositor or
+                     * device edge case prevents the release signal.
+                     */
+                    this._dragWatchdogId = null;
+                    this._completeDrag();
+
+                    return GLib.SOURCE_REMOVE;
+                }
+            );
+
         return Clutter.EVENT_STOP;
     }
 
@@ -2457,6 +2859,14 @@ export default class DiscordVoiceOverlay extends Extension {
 
 
     _clearDrag() {
+        if (this._dragWatchdogId) {
+            GLib.source_remove(
+                this._dragWatchdogId
+            );
+
+            this._dragWatchdogId = null;
+        }
+
         const grab =
             this._dragGrab;
 
@@ -2515,7 +2925,50 @@ export default class DiscordVoiceOverlay extends Extension {
     }
 
 
-    _onStageEvent(event) {
+    _completeDrag(
+        pointerX,
+        pointerY,
+        applyPointerPosition = false
+    ) {
+        if (
+            !this._dragging
+            || !this._dragTarget
+        ) {
+            return;
+        }
+
+        if (applyPointerPosition) {
+            this._setDraggedPosition(
+                this._dragTargetStartX
+                    + pointerX
+                    - this._dragPointerStartX,
+
+                this._dragTargetStartY
+                    + pointerY
+                    - this._dragPointerStartY
+            );
+        }
+
+        this._finishDrag(
+            pointerX,
+            pointerY
+        );
+
+        this._clearDrag();
+
+        if (this._editMode && this._editHistory) {
+            this._editHistory.record(
+                this._captureEditState()
+            );
+        }
+
+        this._lastRenderKey = null;
+        this._tick(true);
+        this._schedulePositionRefresh();
+    }
+
+
+    _onDragMotion(event) {
         if (
             !this._dragging
             || !this._dragTarget
@@ -2523,104 +2976,67 @@ export default class DiscordVoiceOverlay extends Extension {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        const type =
-            event.type();
+        const [pointerX, pointerY] =
+            event.get_coords();
 
-        if (type === Clutter.EventType.MOTION) {
-            const [pointerX, pointerY] =
-                event.get_coords();
-
-            const [, , modifiers] =
-                global.get_pointer();
-
-            if (
-                !(
-                    modifiers
-                    & Clutter.ModifierType.BUTTON1_MASK
-                )
-            ) {
-                /*
-                 * Defensive fallback for a release that was already lost:
-                 * keep the last valid position instead of snapping to the
-                 * cursor on a later unpressed motion event.
-                 */
-                this._finishDrag();
-                this._clearDrag();
-                this._schedulePositionRefresh();
-
-                return Clutter.EVENT_STOP;
-            }
-
-            this._setDraggedPosition(
-                this._dragTargetStartX
-                    + pointerX
-                    - this._dragPointerStartX,
-
-                this._dragTargetStartY
-                    + pointerY
-                    - this._dragPointerStartY
-            );
+        if (
+            !(
+                event.get_state()
+                & Clutter.ModifierType.BUTTON1_MASK
+            )
+        ) {
+            /*
+             * Keep the last valid position rather than snapping to a
+             * later unpressed pointer coordinate.
+             */
+            this._completeDrag();
 
             return Clutter.EVENT_STOP;
+        }
+
+        this._setDraggedPosition(
+            this._dragTargetStartX
+                + pointerX
+                - this._dragPointerStartX,
+
+            this._dragTargetStartY
+                + pointerY
+                - this._dragPointerStartY
+        );
+
+        return Clutter.EVENT_STOP;
+    }
+
+
+    _onDragRelease(event) {
+        if (
+            !this._dragging
+            || !this._dragTarget
+        ) {
+            return Clutter.EVENT_PROPAGATE;
         }
 
         if (
-            type
-            === Clutter.EventType.BUTTON_RELEASE
+            event.get_button()
+            !== Clutter.BUTTON_PRIMARY
         ) {
-            if (
-                event.get_button()
-                !== Clutter.BUTTON_PRIMARY
-            ) {
-                return Clutter.EVENT_STOP;
-            }
-
-            const [pointerX, pointerY] =
-                event.get_coords();
-
-            /*
-             * A release can arrive without a final motion event. Apply
-             * its coordinates before fitting and persisting the actor.
-             */
-            this._setDraggedPosition(
-                this._dragTargetStartX
-                    + pointerX
-                    - this._dragPointerStartX,
-
-                this._dragTargetStartY
-                    + pointerY
-                    - this._dragPointerStartY
-            );
-
-            /*
-             * Persist the destination first, clear the drag state, then
-             * perform exactly one rebuild and one edge-fitting pass.
-             */
-            this._finishDrag(
-                pointerX,
-                pointerY
-            );
-            this._clearDrag();
-
-            this._lastRenderKey = null;
-            this._tick(true);
-            this._schedulePositionRefresh();
-
             return Clutter.EVENT_STOP;
         }
 
-        if (
-            type
-            === Clutter.EventType.KEY_PRESS
-            && event.get_key_symbol()
-                === Clutter.KEY_Escape
-        ) {
-            this._cancelDrag(true);
+        const [pointerX, pointerY] =
+            event.get_coords();
 
-            return Clutter.EVENT_STOP;
-        }
+        /*
+         * A release can arrive without a final motion event. Apply its
+         * coordinates before fitting and persisting the actor.
+         */
+        this._completeDrag(
+            pointerX,
+            pointerY,
+            true
+        );
 
-        return Clutter.EVENT_PROPAGATE;
+        return Clutter.EVENT_STOP;
     }
 
 

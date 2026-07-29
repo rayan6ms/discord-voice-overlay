@@ -7,8 +7,19 @@ PROJECT_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 SOURCE_DIR="$PROJECT_DIR/vencord-plugin/discordVoiceOverlay"
 INSTALL_TMP=''
 BACKUP_DIR=''
+ROLLBACK_NEEDED=false
 
 cleanup() {
+    if \
+        [ "$ROLLBACK_NEEDED" = true ] \
+        && [ -n "$BACKUP_DIR" ] \
+        && [ -e "$BACKUP_DIR" ] \
+        && [ ! -e "${TARGET_DIR:-}" ]
+    then
+        mv "$BACKUP_DIR" "$TARGET_DIR"
+        printf 'Restored the previous plugin after the interrupted install.\n' >&2
+    fi
+
     if [ -n "$INSTALL_TMP" ] && [ -d "$INSTALL_TMP" ]; then
         rm -rf -- "$INSTALL_TMP"
     fi
@@ -76,17 +87,16 @@ if [ -e "$TARGET_DIR" ]; then
     TIMESTAMP=$(date -u '+%Y%m%dT%H%M%SZ')
     BACKUP_DIR="$BACKUP_ROOT/discordVoiceOverlay-$TIMESTAMP-$$"
     mv "$TARGET_DIR" "$BACKUP_DIR"
+    ROLLBACK_NEEDED=true
     printf 'Backed up the existing matching plugin to %s\n' "$BACKUP_DIR"
 fi
 
 if ! mv "$INSTALL_TMP" "$TARGET_DIR"; then
-    if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
-        mv "$BACKUP_DIR" "$TARGET_DIR"
-    fi
-    printf 'Could not install the plugin; the previous copy was restored.\n' >&2
+    printf 'Could not install the plugin source.\n' >&2
     exit 1
 fi
 INSTALL_TMP=''
+ROLLBACK_NEEDED=false
 
 printf 'Installed Vencord plugin source to %s\n' "$TARGET_DIR"
 printf 'Next run: %s/build-vencord.sh %s\n' "$SCRIPT_DIR" "$VENCORD_PATH"

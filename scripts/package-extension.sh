@@ -11,13 +11,13 @@ PROJECT_VERSION=$(sed -n '1p' "$PROJECT_DIR/VERSION")
 RELEASE_TAG=${2:-"v$PROJECT_VERSION"}
 TEMP_DIR=''
 
-case "$RELEASE_TAG" in
-    v[0-9]*.[0-9]*.[0-9]*) ;;
-    *)
-        printf 'Release tag must look like v1.0.0: %s\n' "$RELEASE_TAG" >&2
-        exit 2
-        ;;
-esac
+if \
+    ! printf '%s\n' "$RELEASE_TAG" \
+        | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+then
+    printf 'Release tag must look like v1.0.0: %s\n' "$RELEASE_TAG" >&2
+    exit 2
+fi
 
 cleanup() {
     if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
@@ -26,7 +26,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-for command in python3 unzip zip; do
+for command in grep python3 zip; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Required packaging command not found: %s\n' "$command" >&2
         exit 1
@@ -53,6 +53,7 @@ if command -v gnome-extensions >/dev/null 2>&1; then
         gnome-extensions pack \
             --force \
             --out-dir "$TEMP_DIR" \
+            --extra-source=edit-history.js \
             --extra-source=geometry.js \
             --extra-source=state.js \
             .
@@ -88,6 +89,7 @@ import zipfile
 archive, expected_uuid = sys.argv[1:]
 required = {
     "extension.js",
+    "edit-history.js",
     "geometry.js",
     "state.js",
     "COPYING",

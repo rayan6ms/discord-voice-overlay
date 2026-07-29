@@ -16,13 +16,13 @@ PLUGIN_TARGET=''
 PLUGIN_BACKUP=''
 PLUGIN_ROLLBACK_NEEDED=false
 
-case "$RELEASE_TAG" in
-    v[0-9]*.[0-9]*.[0-9]*) ;;
-    *)
-        printf 'Invalid release version: %s\n' "$RELEASE_TAG" >&2
-        exit 2
-        ;;
-esac
+if \
+    ! printf '%s\n' "$RELEASE_TAG" \
+        | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+then
+    printf 'Invalid release version: %s\n' "$RELEASE_TAG" >&2
+    exit 2
+fi
 
 cleanup() {
     if [ "$PLUGIN_ROLLBACK_NEEDED" = true ]; then
@@ -48,7 +48,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-for command in curl git gnome-extensions node sha256sum unzip; do
+for command in awk curl git gnome-extensions grep node sha256sum unzip; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Missing required command: %s\n' "$command" >&2
         printf 'See the Requirements section in the project README.\n' >&2
@@ -142,6 +142,23 @@ run_pnpm() {
     esac
 }
 
+download() {
+    url=$1
+    destination=$2
+
+    curl \
+        --fail \
+        --location \
+        --silent \
+        --show-error \
+        --retry 3 \
+        --retry-delay 1 \
+        --connect-timeout 20 \
+        --max-time 300 \
+        --output "$destination" \
+        "$url"
+}
+
 DATA_HOME=${XDG_DATA_HOME:-"$HOME/.local/share"}
 EXTENSION_DIR="$DATA_HOME/gnome-shell/extensions/$UUID"
 LEGACY_DIR="$DATA_HOME/gnome-shell/extensions/$LEGACY_UUID"
@@ -161,17 +178,52 @@ PLUGIN_ASSET="discord-voice-overlay-vencord-plugin-$RELEASE_TAG.zip"
 TEMP_DIR=$(mktemp -d)
 
 printf '%s Discord Voice Overlay to %s…\n' "$ACTION" "$RELEASE_TAG"
-curl -fL --retry 3 -o "$TEMP_DIR/$GNOME_ASSET" \
-    "$BASE_URL/$GNOME_ASSET"
-curl -fL --retry 3 -o "$TEMP_DIR/$PLUGIN_ASSET" \
-    "$BASE_URL/$PLUGIN_ASSET"
-curl -fL --retry 3 -o "$TEMP_DIR/SHA256SUMS" \
-    "$BASE_URL/SHA256SUMS"
+printf 'Downloading and verifying release packages…\n'
+download \
+    "$BASE_URL/$GNOME_ASSET" \
+    "$TEMP_DIR/$GNOME_ASSET"
+download \
+    "$BASE_URL/$PLUGIN_ASSET" \
+    "$TEMP_DIR/$PLUGIN_ASSET"
+download \
+    "$BASE_URL/SHA256SUMS" \
+    "$TEMP_DIR/SHA256SUMS"
 
-(
-    cd "$TEMP_DIR"
-    sha256sum --ignore-missing -c SHA256SUMS
-)
+verify_asset() {
+    asset=$1
+    expected=$(
+        awk -v asset="$asset" \
+            '$2 == asset {print $1}' \
+            "$TEMP_DIR/SHA256SUMS"
+    )
+
+    if [ "${#expected}" -ne 64 ]; then
+        printf 'No valid checksum was published for %s.\n' "$asset" >&2
+        exit 1
+    fi
+
+    case "$expected" in
+        *[!0-9a-f]*)
+            printf 'No valid checksum was published for %s.\n' "$asset" >&2
+            exit 1
+            ;;
+    esac
+
+    actual=$(
+        sha256sum "$TEMP_DIR/$asset"
+    )
+    actual=${actual%% *}
+
+    if [ "$actual" != "$expected" ]; then
+        printf 'Checksum verification failed for %s.\n' "$asset" >&2
+        exit 1
+    fi
+
+    printf '%s: OK\n' "$asset"
+}
+
+verify_asset "$GNOME_ASSET"
+verify_asset "$PLUGIN_ASSET"
 
 if [ ! -f "$VENCORD_PATH/package.json" ]; then
     if [ -e "$VENCORD_PATH" ]; then
@@ -182,7 +234,11 @@ if [ ! -f "$VENCORD_PATH/package.json" ]; then
 
     mkdir -p "$(dirname -- "$VENCORD_PATH")"
     printf 'Downloading the Vencord source required for custom plugins…\n'
-    git clone https://github.com/Vendicated/Vencord.git "$VENCORD_PATH"
+    git clone \
+        --depth 1 \
+        --single-branch \
+        https://github.com/Vendicated/Vencord.git \
+        "$VENCORD_PATH"
 else
     printf 'Updating the existing Vencord source checkout…\n'
     git -C "$VENCORD_PATH" pull --ff-only
@@ -223,6 +279,7 @@ if [ -e "$TARGET_DIR" ]; then
     BACKUP_DIR="$BACKUP_ROOT/discordVoiceOverlay-$TIMESTAMP-$$"
     mv "$TARGET_DIR" "$BACKUP_DIR"
     PLUGIN_BACKUP=$BACKUP_DIR
+    PLUGIN_ROLLBACK_NEEDED=true
     printf 'Backed up the previous bridge to %s\n' "$BACKUP_DIR"
 fi
 

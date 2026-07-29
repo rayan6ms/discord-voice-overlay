@@ -11,13 +11,13 @@ PLUGIN_ASSET="discord-voice-overlay-vencord-plugin-$RELEASE_TAG.zip"
 INSTALL_ASSET='install.sh'
 TEMP_DIR=''
 
-case "$RELEASE_TAG" in
-    v[0-9]*.[0-9]*.[0-9]*) ;;
-    *)
-        printf 'Release tag must look like v1.0.0: %s\n' "$RELEASE_TAG" >&2
-        exit 2
-        ;;
-esac
+if \
+    ! printf '%s\n' "$RELEASE_TAG" \
+        | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+then
+    printf 'Release tag must look like v1.0.0: %s\n' "$RELEASE_TAG" >&2
+    exit 2
+fi
 
 if [ "$RELEASE_TAG" != "v$PROJECT_VERSION" ]; then
     printf 'Release tag %s does not match VERSION (%s).\n' \
@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-for command in sha256sum zip; do
+for command in grep sha256sum zip; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Required release command not found: %s\n' "$command" >&2
         exit 1
