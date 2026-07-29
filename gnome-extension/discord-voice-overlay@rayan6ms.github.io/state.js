@@ -35,6 +35,42 @@ export function stateTimestampIsFresh(
 }
 
 
+export function stateExpiryDelay(
+    raw,
+    now = Date.now()
+) {
+    if (!raw)
+        return null;
+
+    try {
+        const parsed = JSON.parse(raw);
+
+        if (
+            !parsed
+            || typeof parsed !== 'object'
+            || Array.isArray(parsed)
+            || parsed.version !== STATE_PROTOCOL_VERSION
+            || typeof parsed.publishedAt !== 'number'
+            || !Number.isFinite(parsed.publishedAt)
+        ) {
+            return null;
+        }
+
+        const age = now - parsed.publishedAt;
+
+        if (age < -STATE_FUTURE_TOLERANCE_MS)
+            return null;
+
+        return Math.max(
+            0,
+            STATE_STALE_AFTER_MS - age + 1
+        );
+    } catch {
+        return null;
+    }
+}
+
+
 export function parseState(raw, now = Date.now()) {
     if (!raw)
         return emptyState();

@@ -61,10 +61,12 @@ interface OverlayState {
 }
 
 
-let timer: number | undefined;
+let heartbeatTimer: number | undefined;
+let scheduledPublishTimer: number | undefined;
 let lastStateJson = "";
 let lastPublishedAt = 0;
 let running = false;
+let pendingForce = false;
 let publishQueue = Promise.resolve();
 
 
@@ -355,12 +357,35 @@ async function publishState(force = false) {
 }
 
 
-function queuePublish(force = false) {
-    publishQueue = publishQueue
-        .then(async () => {
-            if (running)
-                await publishState(force);
-        });
+function schedulePublish(force = false) {
+    if (!running)
+        return;
+
+    pendingForce ||= force;
+
+    if (scheduledPublishTimer !== undefined)
+        return;
+
+    /*
+     * Let Discord's Flux stores finish processing the current event and
+     * coalesce related events dispatched in the same turn.
+     */
+    scheduledPublishTimer =
+        window.setTimeout(
+            () => {
+                scheduledPublishTimer = undefined;
+
+                const forceNow = pendingForce;
+                pendingForce = false;
+
+                publishQueue = publishQueue
+                    .then(async () => {
+                        if (running)
+                            await publishState(forceNow);
+                    });
+            },
+            0
+        );
 }
 
 
@@ -379,40 +404,78 @@ export default definePlugin({
 
     reporterTestable: ReporterTestable.None,
 
+    flux: {
+        SPEAKING: () => schedulePublish(),
+        VOICE_STATE_UPDATES: () => schedulePublish(),
+        VOICE_CHANNEL_SELECT: () => schedulePublish(),
+        CONNECTION_CLOSED: () => schedulePublish(),
+        CONNECTION_OPEN: () => schedulePublish(),
+        CONNECTION_RESUMED: () => schedulePublish(),
+
+        AUDIO_SET_SELF_MUTE: () => schedulePublish(),
+        AUDIO_TOGGLE_SELF_MUTE: () => schedulePublish(),
+        AUDIO_TOGGLE_SELF_DEAF: () => schedulePublish(),
+
+        STREAM_CREATE: () => schedulePublish(),
+        STREAM_DELETE: () => schedulePublish(),
+        STREAM_UPDATE: () => schedulePublish(),
+        STREAMING_UPDATE: () => schedulePublish(),
+        STREAM_START: () => schedulePublish(),
+        STREAM_STOP: () => schedulePublish(),
+        STREAM_CLOSE: () => schedulePublish(),
+
+        CHANNEL_UPDATES: () => schedulePublish(),
+        GUILD_MEMBER_UPDATE: () => schedulePublish(),
+        CURRENT_USER_UPDATE: () => schedulePublish(),
+        USER_UPDATE: () => schedulePublish()
+    },
+
 
     start() {
-        if (timer !== undefined)
-            window.clearInterval(timer);
+        if (heartbeatTimer !== undefined)
+            window.clearInterval(heartbeatTimer);
+
+        if (scheduledPublishTimer !== undefined)
+            window.clearTimeout(scheduledPublishTimer);
 
         running = true;
         lastStateJson = "";
         lastPublishedAt = 0;
+        pendingForce = false;
         publishQueue = Promise.resolve();
 
         /*
-         * 200 ms is responsive enough for speaking indicators while
-         * remaining extremely cheap. Files are only written when the
-         * resulting state actually changes.
+         * Flux events publish actual changes immediately. The heartbeat
+         * is only for detecting an unclean Discord exit.
          */
-        timer = window.setInterval(
-            () => queuePublish(),
-            200
+        heartbeatTimer = window.setInterval(
+            () => schedulePublish(true),
+            HEARTBEAT_INTERVAL_MS
         );
 
-        queuePublish(true);
+        schedulePublish(true);
     },
 
 
     stop() {
         running = false;
 
-        if (timer !== undefined) {
-            window.clearInterval(timer);
-            timer = undefined;
+        if (heartbeatTimer !== undefined) {
+            window.clearInterval(heartbeatTimer);
+            heartbeatTimer = undefined;
+        }
+
+        if (scheduledPublishTimer !== undefined) {
+            window.clearTimeout(
+                scheduledPublishTimer
+            );
+
+            scheduledPublishTimer = undefined;
         }
 
         lastStateJson = "";
         lastPublishedAt = 0;
+        pendingForce = false;
 
         publishQueue = publishQueue
             .catch(() => undefined)
