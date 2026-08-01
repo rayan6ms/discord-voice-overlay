@@ -3,7 +3,10 @@
 
 import assert from 'node:assert/strict';
 import {
+    ACTIVE_USER_OPACITY,
+    IDLE_USER_OPACITY,
     userRowKey,
+    userVisualOpacity,
     visibleUserLayout,
 } from '../gnome-extension/discord-voice-overlay@rayan6ms.github.io/render-model.js';
 
@@ -24,6 +27,22 @@ const rowOptions = {
     nameMaxWidth: 180,
     anchorRight: false,
 };
+
+assert.equal(
+    IDLE_USER_OPACITY,
+    77,
+    'idle users should render at approximately 30% opacity'
+);
+
+assert.equal(
+    userVisualOpacity(false),
+    IDLE_USER_OPACITY
+);
+
+assert.equal(
+    userVisualOpacity(true),
+    ACTIVE_USER_OPACITY
+);
 
 assert.equal(
     userRowKey(users[0], rowOptions),

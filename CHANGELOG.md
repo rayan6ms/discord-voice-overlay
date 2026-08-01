@@ -2,6 +2,17 @@
 
 All notable public changes are documented here.
 
+## [1.0.7] - 2026-08-01
+
+GNOME extension metadata version: 26.
+
+### Changed
+
+- Match Discord's Windows voice widget by rendering idle avatars and names at 30% opacity and restoring full opacity while speaking.
+- Fade between idle and speaking states over 150 ms instead of changing brightness abruptly.
+- Keep voice rows fully visible while edit mode is open.
+- Use mute and deafen icons without applying a separate opacity level to those users.
+
 ## [1.0.6] - 2026-07-29
 
 GNOME extension metadata version: 25.
@@ -170,3 +181,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.4]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.4
 [1.0.5]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.5
 [1.0.6]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.6
+[1.0.7]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.7
