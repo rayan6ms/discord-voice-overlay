@@ -1,5 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+/*
+ * Match Discord's pinned voice-widget treatment: keep idle avatars and
+ * names at 30% opacity, then restore them fully while that user speaks.
+ */
+export const IDLE_USER_OPACITY = 77;
+export const ACTIVE_USER_OPACITY = 255;
+
+
+export function userVisualOpacity(active) {
+    return active
+        ? ACTIVE_USER_OPACITY
+        : IDLE_USER_OPACITY;
+}
+
+
 export function userRowKey(
     user,
     {

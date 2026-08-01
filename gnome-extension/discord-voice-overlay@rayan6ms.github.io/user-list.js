@@ -7,8 +7,12 @@ import St from 'gi://St';
 
 import {
     userRowKey,
+    userVisualOpacity,
     visibleUserLayout,
 } from './render-model.js';
+
+
+const USER_ACTIVITY_FADE_MS = 150;
 
 
 function avatarCssUrl(value) {
@@ -103,7 +107,8 @@ function createUserRow(
     ringInside,
     nameMaxWidth,
     anchorRight,
-    statusIcons
+    statusIcons,
+    editMode
 ) {
     const avatarOuterSize =
         ringInside
@@ -326,10 +331,22 @@ function createUserRow(
     let lastLive = null;
     let lastMuted = null;
     let lastDeafened = null;
+    let lastVisuallyActive = null;
 
-    const update = currentUser => {
+    const update = (
+        currentUser,
+        forceVisible = false
+    ) => {
         const speaking =
             Boolean(currentUser.speaking);
+
+        const visuallyActive =
+            speaking || forceVisible;
+
+        const visualOpacity =
+            userVisualOpacity(
+                visuallyActive
+            );
 
         const live =
             Boolean(
@@ -368,15 +385,23 @@ function createUserRow(
             );
         }
 
-        namePlate.opacity =
-            speaking
-                ? 255
-                : (
-                    currentUser.muted
-                    || currentUser.deafened
-                        ? 150
-                        : 185
-                );
+        if (lastVisuallyActive === null) {
+            row.opacity =
+                visualOpacity;
+        } else if (
+            visuallyActive
+            !== lastVisuallyActive
+        ) {
+            row.remove_all_transitions();
+            row.ease({
+                opacity: visualOpacity,
+                duration:
+                    USER_ACTIVITY_FADE_MS,
+                mode:
+                    Clutter.AnimationMode
+                        .EASE_OUT_QUAD,
+            });
+        }
 
         liveBadge.visible = live;
 
@@ -389,11 +414,13 @@ function createUserRow(
         lastLive = live;
         lastMuted = muted;
         lastDeafened = deafened;
+        lastVisuallyActive =
+            visuallyActive;
 
         return sizeChanged;
     };
 
-    update(user);
+    update(user, editMode);
 
     return {
         actor: row,
@@ -561,7 +588,8 @@ export class UserListRenderer {
                             ringInside,
                             nameMaxWidth,
                             anchorRight,
-                            this._statusIcons
+                            this._statusIcons,
+                            editMode
                         ),
                 };
 
@@ -572,7 +600,10 @@ export class UserListRenderer {
             }
 
             sizeChanged =
-                cached.row.update(user)
+                cached.row.update(
+                    user,
+                    editMode
+                )
                 || sizeChanged;
 
             retainedRows.add(cacheId);
