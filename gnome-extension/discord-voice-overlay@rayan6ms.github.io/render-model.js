@@ -15,6 +15,31 @@ export function userVisualOpacity(active) {
 }
 
 
+export function overlayPlaceholderText({
+    overlayEnabled,
+    editMode,
+    stateConnected,
+    speakingOnly,
+    userCount,
+}) {
+    if (!editMode)
+        return null;
+
+    if (!overlayEnabled)
+        return 'Overlay hidden';
+
+    if (userCount > 0)
+        return null;
+
+    if (!stateConnected)
+        return 'Discord voice: disconnected';
+
+    return speakingOnly
+        ? 'No one speaking'
+        : 'No voice users';
+}
+
+
 export function userRowKey(
     user,
     {

@@ -2,6 +2,23 @@
 
 All notable public changes are documented here.
 
+## [1.0.8] - 2026-08-03
+
+GNOME extension metadata version: 27.
+
+### Fixed
+
+- Keep the voice-overlay drag header aligned to its stable outer edge when the visible user list changes width or becomes empty.
+- Show a `No one speaking` placeholder in edit mode when speaking-only filtering removes every user.
+- Mirror avatar and name placement immediately while dragging across a monitor's midpoint instead of waiting for release.
+- Use the pointer's current monitor for live orientation and drag-header previews across multi-monitor boundaries.
+- Restore the saved orientation when an in-progress drag is cancelled.
+- Hide the separate overlay drag header whenever the selected application is no longer focused.
+
+### Changed
+
+- Reuse empty-state placeholder actors instead of destroying and recreating them on every state update.
+
 ## [1.0.7] - 2026-08-01
 
 GNOME extension metadata version: 26.
@@ -182,3 +199,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.5]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.5
 [1.0.6]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.6
 [1.0.7]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.7
+[1.0.8]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.8
