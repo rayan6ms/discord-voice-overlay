@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
     ACTIVE_USER_OPACITY,
     IDLE_USER_OPACITY,
+    overlayPlaceholderText,
     userRowKey,
     userVisualOpacity,
     visibleUserLayout,
@@ -42,6 +43,74 @@ assert.equal(
 assert.equal(
     userVisualOpacity(true),
     ACTIVE_USER_OPACITY
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: true,
+        editMode: true,
+        stateConnected: true,
+        speakingOnly: true,
+        userCount: 0,
+    }),
+    'No one speaking',
+    'speaking-only edit mode must retain a visible layout child'
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: true,
+        editMode: true,
+        stateConnected: false,
+        speakingOnly: true,
+        userCount: 0,
+    }),
+    'Discord voice: disconnected'
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: true,
+        editMode: false,
+        stateConnected: true,
+        speakingOnly: true,
+        userCount: 0,
+    }),
+    null,
+    'empty-state guidance belongs only to edit mode'
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: false,
+        editMode: true,
+        stateConnected: true,
+        speakingOnly: false,
+        userCount: 3,
+    }),
+    'Overlay hidden'
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: true,
+        editMode: true,
+        stateConnected: true,
+        speakingOnly: false,
+        userCount: 0,
+    }),
+    'No voice users'
+);
+
+assert.equal(
+    overlayPlaceholderText({
+        overlayEnabled: true,
+        editMode: true,
+        stateConnected: true,
+        speakingOnly: true,
+        userCount: 1,
+    }),
+    null
 );
 
 assert.equal(

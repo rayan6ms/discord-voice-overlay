@@ -6,6 +6,7 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {
+    overlayPlaceholderText,
     userRowKey,
     userVisualOpacity,
     visibleUserLayout,
@@ -495,37 +496,36 @@ export class UserListRenderer {
             return;
 
         if (!overlayEnabled) {
-            this._destroyRowsExcept(new Set());
+            let sizeChanged =
+                this._destroyRowsExcept(
+                    new Set()
+                );
+
+            if (this._overflowRow)
+                sizeChanged = true;
+
             this._destroyOverflow();
 
-            if (editMode) {
-                this._placeholder ??=
-                    new St.Label({
-                        text: 'Overlay hidden',
-                        style_class: 'dvo-placeholder',
-                        reactive: false,
-                    });
-
-                this._placeActor(
-                    this._placeholder,
+            sizeChanged =
+                this._updatePlaceholder(
+                    overlayPlaceholderText({
+                        overlayEnabled,
+                        editMode,
+                        stateConnected,
+                        speakingOnly,
+                        userCount: 0,
+                    }),
                     0
-                );
-            } else if (this._placeholder) {
-                this._placeholder.destroy();
-                this._placeholder = null;
-            }
+                )
+                || sizeChanged;
 
-            this._onSizeChanged?.();
+            if (sizeChanged)
+                this._onSizeChanged?.();
+
             return;
         }
 
-        let sizeChanged =
-            Boolean(this._placeholder);
-
-        if (this._placeholder) {
-            this._placeholder.destroy();
-            this._placeholder = null;
-        }
+        let sizeChanged = false;
 
         const {
             visibleUsers,
@@ -667,41 +667,57 @@ export class UserListRenderer {
             this._destroyOverflow();
         }
 
-        if (
-            users.length === 0
-            && editMode
-            && !(stateConnected && speakingOnly)
-        ) {
-            const placeholderText =
-                stateConnected
-                    ? 'No voice users'
-                    : 'Discord voice: disconnected';
+        sizeChanged =
+            this._updatePlaceholder(
+                overlayPlaceholderText({
+                    overlayEnabled,
+                    editMode,
+                    stateConnected,
+                    speakingOnly,
+                    userCount: users.length,
+                }),
+                desiredActors.length
+            )
+            || sizeChanged;
 
-            if (
-                !this._placeholder
-                || this._placeholder.text
-                    !== placeholderText
-            ) {
-                sizeChanged = true;
-            }
+        if (sizeChanged)
+            this._onSizeChanged?.();
+    }
 
-            this._placeholder ??=
+
+    _updatePlaceholder(text, index) {
+        if (!text) {
+            if (!this._placeholder)
+                return false;
+
+            this._placeholder.destroy();
+            this._placeholder = null;
+            return true;
+        }
+
+        let changed = false;
+
+        if (!this._placeholder) {
+            this._placeholder =
                 new St.Label({
                     style_class: 'dvo-placeholder',
                     reactive: false,
                 });
 
-            this._placeholder.text =
-                placeholderText;
-
-            this._placeActor(
-                this._placeholder,
-                desiredActors.length
-            );
+            changed = true;
         }
 
-        if (sizeChanged)
-            this._onSizeChanged?.();
+        if (this._placeholder.text !== text) {
+            this._placeholder.text = text;
+            changed = true;
+        }
+
+        this._placeActor(
+            this._placeholder,
+            index
+        );
+
+        return changed;
     }
 
 

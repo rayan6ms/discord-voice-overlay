@@ -14,6 +14,7 @@ const encoded = Buffer.from(source).toString("base64");
 
 const {
     actorShouldAnchorRight,
+    alignedDragHandleX,
     fitRectToMonitor,
     monitorForPoint
 } = await import(`data:text/javascript;base64,${encoded}`);
@@ -102,6 +103,59 @@ assert.equal(
         left
     ),
     false
+);
+
+assert.equal(
+    actorShouldAnchorRight(
+        400,
+        200,
+        left
+    ),
+    false,
+    'the exact midpoint remains left-anchored'
+);
+
+assert.equal(
+    actorShouldAnchorRight(
+        401,
+        200,
+        left
+    ),
+    true,
+    'orientation changes immediately after crossing the midpoint'
+);
+
+assert.equal(
+    alignedDragHandleX(
+        250,
+        40,
+        110,
+        false
+    ),
+    250,
+    'an empty left-anchored overlay keeps the handle on its left edge'
+);
+
+assert.equal(
+    alignedDragHandleX(
+        710,
+        40,
+        110,
+        true
+    ),
+    640,
+    'an empty right-anchored overlay keeps the handle on its right edge'
+);
+
+assert.equal(
+    alignedDragHandleX(
+        550,
+        200,
+        110,
+        true
+    ),
+    640,
+    'right-edge handle placement stays fixed when content width changes'
 );
 
 console.log("Overlay geometry tests passed.");

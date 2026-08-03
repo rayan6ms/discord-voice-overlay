@@ -112,3 +112,15 @@ export function actorShouldAnchorRight(
         > monitor.x + monitor.width / 2
     );
 }
+
+
+export function alignedDragHandleX(
+    actorX,
+    actorWidth,
+    handleWidth,
+    anchorRight
+) {
+    return anchorRight
+        ? actorX + actorWidth - handleWidth
+        : actorX;
+}
