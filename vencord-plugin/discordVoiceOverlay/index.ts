@@ -17,21 +17,15 @@ import {
 
 import { getAvatarUrl } from "./avatar";
 
-
 const Native = VencordNative.pluginHelpers.DiscordVoiceOverlay as PluginNative<typeof import("./native")>;
 
 const STATE_PROTOCOL_VERSION = 2 as const;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
-
-/*
- * SpeakingStore is not exported by @webpack/common, so retrieve
- * Discord's Flux store by its stable store name.
- */
+// SpeakingStore is not exported by @webpack/common.
 const SpeakingStore = findStoreLazy("SpeakingStore") as {
     isSpeaking(userId: string): boolean;
 };
-
 
 interface OverlayUser {
     id: string;
@@ -45,23 +39,12 @@ interface OverlayUser {
     self: boolean;
 }
 
-
 interface OverlayState {
     version: typeof STATE_PROTOCOL_VERSION;
-
     publishedAt: number;
-
     connected: boolean;
-
-    channel: null | {
-        id: string;
-        name: string;
-        guildId: string | null;
-    };
-
     users: OverlayUser[];
 }
-
 
 let heartbeatTimer: number | undefined;
 let scheduledPublishTimer: number | undefined;
@@ -71,12 +54,8 @@ let running = false;
 let pendingForce = false;
 let publishQueue = Promise.resolve();
 
-
 function getVoiceChannelId(): string | null {
-    /*
-     * Prefer the actual client voice connection rather than whatever
-     * channel happens to be selected in Discord's UI.
-     */
+    // Prefer the actual voice connection over the selected UI channel.
     const store = VoiceStateStore as any;
 
     let current: string | null | undefined;
@@ -89,17 +68,11 @@ function getVoiceChannelId(): string | null {
         }
     }
 
-    /*
-     * Some Discord builds expose getCurrentClientVoiceChannelId()
-     * but return null here. Vencord itself currently uses
-     * SelectedChannelStore.getVoiceChannelId() for the active VC,
-     * so fall back when the first result is empty as well.
-     */
+    // Some Discord builds expose the method but still return null.
     current ??= SelectedChannelStore.getVoiceChannelId();
 
     return current ?? null;
 }
-
 
 function isSpeaking(userId: string): boolean {
     try {
@@ -109,22 +82,13 @@ function isSpeaking(userId: string): boolean {
     }
 }
 
-
-/*
- * Discord exposes both ApplicationStream and active Stream objects.
- * getAnyStreamForUser() handles either representation.
- */
 function isLive(
     userId: string,
     channelId: string,
     guildId: string | null
 ): boolean {
     try {
-        /*
-         * Use Discord's active-stream lookup rather than
-         * getAnyStreamForUser(), which may retain an application-stream
-         * object briefly after sharing ends.
-         */
+        // getAnyStreamForUser() can briefly retain a stopped stream.
         const stream =
             (
                 ApplicationStreamingStore
@@ -156,26 +120,16 @@ function isLive(
     }
 }
 
-
 function buildState(): Omit<OverlayState, "publishedAt"> {
     const channelId = getVoiceChannelId();
+    const channel = channelId
+        ? ChannelStore.getChannel(channelId)
+        : null;
 
-    if (!channelId) {
+    if (!channelId || !channel) {
         return {
             version: STATE_PROTOCOL_VERSION,
             connected: false,
-            channel: null,
-            users: []
-        };
-    }
-
-    const channel = ChannelStore.getChannel(channelId);
-
-    if (!channel) {
-        return {
-            version: STATE_PROTOCOL_VERSION,
-            connected: false,
-            channel: null,
             users: []
         };
     }
@@ -183,6 +137,7 @@ function buildState(): Omit<OverlayState, "publishedAt"> {
     const currentUser = UserStore.getCurrentUser();
 
     const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId) as Record<string, any>;
+    const guildId = channel.guild_id ?? null;
 
     const users: OverlayUser[] = [];
 
@@ -192,8 +147,6 @@ function buildState(): Omit<OverlayState, "publishedAt"> {
 
         if (!user)
             continue;
-
-        const guildId = channel.guild_id ?? null;
 
         let nickname: string | null = null;
 
@@ -223,7 +176,7 @@ function buildState(): Omit<OverlayState, "publishedAt"> {
             live: isLive(
                 userId,
                 channelId,
-                channel.guild_id ?? null
+                guildId
             ),
 
             muted: Boolean(
@@ -240,12 +193,7 @@ function buildState(): Omit<OverlayState, "publishedAt"> {
         });
     }
 
-    /*
-     * Keep ordering stable so a speaking change doesn't randomly
-     * rearrange people in the overlay.
-     *
-     * Local user first; everyone else alphabetically.
-     */
+    // Keep the local user first and everyone else in a stable order.
     users.sort((a, b) => {
         if (a.self !== b.self)
             return a.self ? -1 : 1;
@@ -256,17 +204,9 @@ function buildState(): Omit<OverlayState, "publishedAt"> {
     return {
         version: STATE_PROTOCOL_VERSION,
         connected: true,
-
-        channel: {
-            id: channelId,
-            name: channel.name ?? "Voice Channel",
-            guildId: channel.guild_id ?? null
-        },
-
         users
     };
 }
-
 
 async function publishState(force = false) {
     try {
@@ -277,10 +217,6 @@ async function publishState(force = false) {
 
         const now = Date.now();
 
-        /*
-         * Republish unchanged state occasionally so GNOME can detect
-         * an unclean Discord exit without returning to frequent writes.
-         */
         if (
             !force
             && stateJson === lastStateJson
@@ -311,7 +247,6 @@ async function publishState(force = false) {
     }
 }
 
-
 function schedulePublish(force = false) {
     if (!running)
         return;
@@ -321,10 +256,7 @@ function schedulePublish(force = false) {
     if (scheduledPublishTimer !== undefined)
         return;
 
-    /*
-     * Let Discord's Flux stores finish processing the current event and
-     * coalesce related events dispatched in the same turn.
-     */
+    // Coalesce related Flux events dispatched in the same turn.
     scheduledPublishTimer =
         window.setTimeout(
             () => {
@@ -343,12 +275,11 @@ function schedulePublish(force = false) {
         );
 }
 
-
 export default definePlugin({
     name: "DiscordVoiceOverlay",
 
     description:
-        "Exports the current Discord voice channel for a local GNOME overlay.",
+        "Exports Discord voice activity for a local GNOME overlay.",
 
     authors: [
         {
@@ -385,7 +316,6 @@ export default definePlugin({
         USER_UPDATE: () => schedulePublish()
     },
 
-
     start() {
         if (heartbeatTimer !== undefined)
             window.clearInterval(heartbeatTimer);
@@ -399,10 +329,7 @@ export default definePlugin({
         pendingForce = false;
         publishQueue = Promise.resolve();
 
-        /*
-         * Flux events publish actual changes immediately. The heartbeat
-         * is only for detecting an unclean Discord exit.
-         */
+        // The heartbeat lets GNOME detect an unclean Discord exit.
         heartbeatTimer = window.setInterval(
             () => schedulePublish(true),
             HEARTBEAT_INTERVAL_MS
@@ -410,7 +337,6 @@ export default definePlugin({
 
         schedulePublish(true);
     },
-
 
     stop() {
         running = false;

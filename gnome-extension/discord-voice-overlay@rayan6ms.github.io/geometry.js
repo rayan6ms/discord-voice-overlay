@@ -52,7 +52,6 @@ export function monitorForPoint(
     return nearest ?? primaryMonitor ?? null;
 }
 
-
 export function fitRectToMonitor(
     width,
     height,
@@ -101,7 +100,6 @@ export function fitRectToMonitor(
     ];
 }
 
-
 export function actorShouldAnchorRight(
     actorX,
     actorWidth,
@@ -112,7 +110,6 @@ export function actorShouldAnchorRight(
         > monitor.x + monitor.width / 2
     );
 }
-
 
 export function alignedDragHandleX(
     actorX,

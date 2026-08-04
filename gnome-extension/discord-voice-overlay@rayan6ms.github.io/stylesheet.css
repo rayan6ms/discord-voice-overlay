@@ -1,9 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-.dvo-root {
-    spacing: 5px;
-}
-
 .dvo-toolbar {
     spacing: 5px;
     padding: 6px;
@@ -81,11 +77,6 @@
     spacing: 6px;
 }
 
-
-.dvo-avatar-stack {
-    border-radius: 999px;
-}
-
 .dvo-avatar-ring-inside {
     border: 2px solid #23a55a;
     border-radius: 999px;
@@ -127,7 +118,6 @@
     font-weight: 600;
 }
 
-
 .dvo-live-badge {
     padding: 1px 4px;
     border-radius: 3px;
@@ -141,18 +131,12 @@
     color: rgba(255, 255, 255, 0.90);
 }
 
-.dvo-status-muted,
-.dvo-status-deafened {
-    icon-size: 12px;
-}
-
 .dvo-placeholder {
     color: rgba(255, 255, 255, 0.75);
     font-size: 12px;
     font-style: italic;
     padding: 4px 6px;
 }
-
 
 .dvo-overflow {
     padding: 2px 7px;

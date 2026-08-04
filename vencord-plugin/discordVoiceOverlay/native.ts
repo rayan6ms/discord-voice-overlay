@@ -32,9 +32,6 @@ export async function writeState(_: unknown, json: string) {
 
     await chmod(directory, 0o700);
 
-    /*
-     * Write atomically so GNOME never sees half-written JSON.
-     */
     await writeFile(temporaryFile, json, {
         encoding: "utf8",
         mode: 0o600

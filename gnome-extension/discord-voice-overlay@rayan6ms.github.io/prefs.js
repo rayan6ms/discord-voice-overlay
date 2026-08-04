@@ -10,7 +10,6 @@ import {
     gettext as _,
 } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-
 const SHELL_DBUS_NAME = 'org.gnome.Shell';
 
 const APPLICATIONS_DBUS_PATH =
@@ -36,7 +35,6 @@ const ApplicationPickerProxy =
         APPLICATIONS_DBUS_XML
     );
 
-
 function normalizedIdentifiers(values) {
     if (!Array.isArray(values))
         return [];
@@ -52,7 +50,6 @@ function normalizedIdentifiers(values) {
             left.localeCompare(right)
     );
 }
-
 
 function applicationIcon(desktopId) {
     if (
@@ -71,7 +68,6 @@ function applicationIcon(desktopId) {
         return null;
     }
 }
-
 
 function applicationSubtitle(application) {
     const identifiers =
@@ -99,17 +95,13 @@ function applicationSubtitle(application) {
     return identityText;
 }
 
-
 export default class DiscordVoiceOverlayPreferences
     extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings =
             this.getSettings();
 
-        /*
-         * Keep runtime objects alive for as long as the preferences
-         * window exists.
-         */
+        // Keep settings alive with the preferences window.
         window._settings = settings;
         window.set_default_size(720, 760);
 
@@ -120,15 +112,13 @@ export default class DiscordVoiceOverlayPreferences
 
         window.add(page);
 
-
-        const behaviourGroup = new Adw.PreferencesGroup({
-            title: _('Behaviour'),
+        const behaviorGroup = new Adw.PreferencesGroup({
+            title: _('Behavior'),
             description:
                 _('These settings also remain available in the in-game edit toolbar.'),
         });
 
-        page.add(behaviourGroup);
-
+        page.add(behaviorGroup);
 
         const overlayRow = new Adw.SwitchRow({
             title: _('Overlay enabled'),
@@ -136,7 +126,7 @@ export default class DiscordVoiceOverlayPreferences
                 _('Show the voice overlay over allowed applications.'),
         });
 
-        behaviourGroup.add(overlayRow);
+        behaviorGroup.add(overlayRow);
 
         settings.bind(
             'overlay-enabled',
@@ -145,14 +135,13 @@ export default class DiscordVoiceOverlayPreferences
             Gio.SettingsBindFlags.DEFAULT
         );
 
-
         const speakingRow = new Adw.SwitchRow({
             title: _('Speaking only'),
             subtitle:
                 _('Hide users who are not currently speaking.'),
         });
 
-        behaviourGroup.add(speakingRow);
+        behaviorGroup.add(speakingRow);
 
         settings.bind(
             'speaking-only',
@@ -161,14 +150,13 @@ export default class DiscordVoiceOverlayPreferences
             Gio.SettingsBindFlags.DEFAULT
         );
 
-
         const ringRow = new Adw.SwitchRow({
             title: _('Speaking ring inside avatar'),
             subtitle:
                 _('Reduce row size by drawing the green ring over the avatar edge.'),
         });
 
-        behaviourGroup.add(ringRow);
+        behaviorGroup.add(ringRow);
 
         settings.bind(
             'ring-inside',
@@ -176,7 +164,6 @@ export default class DiscordVoiceOverlayPreferences
             'active',
             Gio.SettingsBindFlags.DEFAULT
         );
-
 
         const nameWidthAdjustment =
             new Gtk.Adjustment({
@@ -191,14 +178,14 @@ export default class DiscordVoiceOverlayPreferences
             });
 
         const nameWidthRow = new Adw.SpinRow({
-            title: _('Maximum username width'),
+            title: _('Maximum name width'),
             subtitle:
                 _('Longer names stay on one line and end with an ellipsis.'),
             adjustment: nameWidthAdjustment,
             digits: 0,
         });
 
-        behaviourGroup.add(nameWidthRow);
+        behaviorGroup.add(nameWidthRow);
 
         nameWidthRow.connect(
             'notify::value',
@@ -209,7 +196,6 @@ export default class DiscordVoiceOverlayPreferences
                 );
             }
         );
-
 
         const maxUsersAdjustment =
             new Gtk.Adjustment({
@@ -231,7 +217,7 @@ export default class DiscordVoiceOverlayPreferences
             digits: 0,
         });
 
-        behaviourGroup.add(maxUsersRow);
+        behaviorGroup.add(maxUsersRow);
 
         maxUsersRow.connect(
             'notify::value',
@@ -243,7 +229,6 @@ export default class DiscordVoiceOverlayPreferences
             }
         );
 
-
         const edgeLayoutRow = new Adw.ActionRow({
             title: _('Automatic edge layout'),
             subtitle:
@@ -251,15 +236,13 @@ export default class DiscordVoiceOverlayPreferences
         });
 
         edgeLayoutRow.add_css_class('property');
-        behaviourGroup.add(edgeLayoutRow);
-
+        behaviorGroup.add(edgeLayoutRow);
 
         const shortcutGroup = new Adw.PreferencesGroup({
             title: _('Keyboard shortcut'),
         });
 
         page.add(shortcutGroup);
-
 
         const shortcutRow = new Adw.EntryRow({
             title: _('Edit-mode shortcut'),
@@ -268,10 +251,8 @@ export default class DiscordVoiceOverlayPreferences
 
         shortcutGroup.add(shortcutRow);
 
-
         const shortcutEffectDescription =
             _('Changes take effect immediately while an allowed application is focused.');
-
 
         const updateShortcutUi = () => {
             const shortcut =
@@ -309,7 +290,6 @@ export default class DiscordVoiceOverlayPreferences
             shortcutGroup.description =
                 `${_('Current shortcut')}: ${displayShortcut}. ${shortcutEffectDescription}`;
         };
-
 
         const saveShortcut = () => {
             const requested =
@@ -356,7 +336,6 @@ export default class DiscordVoiceOverlayPreferences
             updateShortcutUi();
         };
 
-
         shortcutRow.connect(
             'apply',
             saveShortcut
@@ -369,7 +348,6 @@ export default class DiscordVoiceOverlayPreferences
 
         updateShortcutUi();
 
-
         const openApplicationsGroup =
             new Adw.PreferencesGroup({
                 title: _('Open applications'),
@@ -378,7 +356,6 @@ export default class DiscordVoiceOverlayPreferences
             });
 
         page.add(openApplicationsGroup);
-
 
         const refreshButton = new Gtk.Button({
             icon_name: 'view-refresh-symbolic',
@@ -391,7 +368,6 @@ export default class DiscordVoiceOverlayPreferences
             refreshButton
         );
 
-
         const applicationsStatusRow =
             new Adw.ActionRow({
                 title: _('Loading open applications…'),
@@ -403,7 +379,6 @@ export default class DiscordVoiceOverlayPreferences
             applicationsStatusRow
         );
 
-
         const closedApplicationsGroup =
             new Adw.PreferencesGroup({
                 title: _('Allowed but currently closed'),
@@ -414,7 +389,6 @@ export default class DiscordVoiceOverlayPreferences
 
         page.add(closedApplicationsGroup);
 
-
         const advancedGroup = new Adw.PreferencesGroup({
             title: _('Advanced identifiers'),
             description:
@@ -422,7 +396,6 @@ export default class DiscordVoiceOverlayPreferences
         });
 
         page.add(advancedGroup);
-
 
         const identifiersRow = new Adw.EntryRow({
             title: _('Exact window identifiers'),
@@ -435,7 +408,6 @@ export default class DiscordVoiceOverlayPreferences
                 .join(', ');
 
         advancedGroup.add(identifiersRow);
-
 
         const saveIdentifiers = () => {
             const identifiers =
@@ -462,7 +434,6 @@ export default class DiscordVoiceOverlayPreferences
             saveIdentifiers
         );
 
-
         let openApplicationRows = [];
         let closedApplicationRows = [];
         let lastApplications = [];
@@ -478,14 +449,12 @@ export default class DiscordVoiceOverlayPreferences
         let pickerTotalWindows = 0;
         let pickerEligibleWindows = 0;
 
-
         const clearRows = (group, rows) => {
             for (const row of rows)
                 group.remove(row);
 
             rows.length = 0;
         };
-
 
         const renderApplications = () => {
             clearRows(
@@ -683,7 +652,6 @@ export default class DiscordVoiceOverlayPreferences
             }
         };
 
-
         const scheduleRender = () => {
             if (
                 preferencesClosed
@@ -701,7 +669,6 @@ export default class DiscordVoiceOverlayPreferences
                 }
             );
         };
-
 
         const getApplicationPickerProxy = async () => {
             if (applicationPickerProxy)
@@ -728,7 +695,6 @@ export default class DiscordVoiceOverlayPreferences
 
             return applicationPickerProxy;
         };
-
 
         const refreshApplications = async () => {
             if (
@@ -868,12 +834,10 @@ export default class DiscordVoiceOverlayPreferences
             }
         };
 
-
         refreshButton.connect(
             'clicked',
             () => void refreshApplications()
         );
-
 
         const settingsChangedId =
             settings.connect(
@@ -893,13 +857,11 @@ export default class DiscordVoiceOverlayPreferences
                 }
             );
 
-
         const shortcutChangedId =
             settings.connect(
                 'changed::toggle-edit-mode',
                 updateShortcutUi
             );
-
 
         refreshTimerId =
             GLib.timeout_add_seconds(
@@ -910,7 +872,6 @@ export default class DiscordVoiceOverlayPreferences
                     return GLib.SOURCE_CONTINUE;
                 }
             );
-
 
         window.connect(
             'close-request',
@@ -944,7 +905,6 @@ export default class DiscordVoiceOverlayPreferences
                 return false;
             }
         );
-
 
         void refreshApplications();
     }

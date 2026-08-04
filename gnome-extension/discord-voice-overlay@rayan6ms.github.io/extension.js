@@ -28,7 +28,6 @@ import {
     windowIdentityCandidates,
 } from './window-identity.js';
 
-
 const AVATAR_SIZE_MIN = 20;
 const AVATAR_SIZE_MAX = 64;
 const AVATAR_SIZE_STEP = 2;
@@ -51,8 +50,21 @@ const UNDO_EDIT_KEYBINDING = 'undo-edit';
 const REDO_EDIT_KEYBINDING = 'redo-edit';
 const EDIT_HISTORY_LIMIT = 100;
 const DRAG_WATCHDOG_MS = 100;
-const EXTENSION_VERSION = 27;
+const EXTENSION_VERSION = 28;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
+
+const OVERLAY_POSITION_KEYS = new Set([
+    'position-x',
+    'position-y',
+    'position-global',
+    'anchor-right',
+]);
+
+const PALETTE_POSITION_KEYS = new Set([
+    'palette-position-x',
+    'palette-position-y',
+    'palette-position-set',
+]);
 
 const IDENTITY_DBUS_PATH =
     '/org/gnome/Shell/Extensions/DiscordVoiceOverlay';
@@ -72,7 +84,6 @@ const IDENTITY_DBUS_XML = `
   </interface>
 </node>`;
 
-
 function runtimeStatePath() {
     const runtimeDir = GLib.getenv('XDG_RUNTIME_DIR');
 
@@ -85,8 +96,6 @@ function runtimeStatePath() {
         'state.json',
     ]);
 }
-
-
 
 export default class DiscordVoiceOverlay extends Extension {
     enable() {
@@ -146,10 +155,7 @@ export default class DiscordVoiceOverlay extends Extension {
         this._editKeybindings = new Set();
         this._dragging = false;
 
-        /*
-         * Prevent each half of a two-coordinate save from immediately
-         * reapplying the other coordinate's old value.
-         */
+        // Settings signals fire once for each coordinate in a position save.
         this._savingPosition = false;
 
         this._dragTarget = null;
@@ -172,10 +178,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._monitorsChangedId = null;
 
-        /*
-         * Mutter's unredirect API is reference-counted, so call it only
-         * on state transitions and always balance it during disable().
-         */
+        // Mutter's unredirect API is reference-counted.
         this._unredirectDisabled = false;
 
         this._settingsSignalIds = [];
@@ -207,11 +210,7 @@ export default class DiscordVoiceOverlay extends Extension {
                     this._applySavedPosition();
                 }
 
-                /*
-                 * Disable fullscreen unredirection before repainting
-                 * the overlay. Some fullscreen XWayland games otherwise bypass
-                 * the composited Shell scene after a focus transition.
-                 */
+                // Fullscreen XWayland windows may otherwise bypass Shell.
                 this._syncUnredirect();
                 this._syncKeybinding();
                 this._tick(true);
@@ -226,16 +225,8 @@ export default class DiscordVoiceOverlay extends Extension {
             'name-max-width',
             'max-visible-users',
             'toggle-edit-mode',
-
-            'position-x',
-            'position-y',
-            'position-global',
-            'anchor-right',
-
-            'palette-position-x',
-            'palette-position-y',
-            'palette-position-set',
-
+            ...OVERLAY_POSITION_KEYS,
+            ...PALETTE_POSITION_KEYS,
             'allowed-wm-classes',
         ]) {
             this._settingsSignalIds.push(
@@ -245,39 +236,27 @@ export default class DiscordVoiceOverlay extends Extension {
                         if (this._applyingEditState)
                             return;
 
-                        const positionKeys = [
-                            'position-x',
-                            'position-y',
-                            'position-global',
-                            'anchor-right',
-                            'palette-position-x',
-                            'palette-position-y',
-                            'palette-position-set',
-                        ];
+                        const overlayPositionChanged =
+                            OVERLAY_POSITION_KEYS.has(key);
+
+                        const palettePositionChanged =
+                            PALETTE_POSITION_KEYS.has(key);
 
                         if (
                             this._savingPosition
-                            && positionKeys.includes(key)
+                            && (
+                                overlayPositionChanged
+                                || palettePositionChanged
+                            )
                         ) {
                             return;
                         }
 
-                        if (
-                            key === 'position-x'
-                            || key === 'position-y'
-                            || key === 'position-global'
-                            || key === 'anchor-right'
-                        ) {
+                        if (overlayPositionChanged)
                             this._applySavedPosition();
-                        }
 
-                        if (
-                            key === 'palette-position-x'
-                            || key === 'palette-position-y'
-                            || key === 'palette-position-set'
-                        ) {
+                        if (palettePositionChanged)
                             this._applyPalettePosition();
-                        }
 
                         if (key === 'allowed-wm-classes') {
                             this._syncUnredirect();
@@ -321,18 +300,10 @@ export default class DiscordVoiceOverlay extends Extension {
         this._tick(true);
     }
 
-
     disable() {
-        /*
-         * Restore Mutter's normal fullscreen optimisation before
-         * destroying any extension state.
-         */
         this._setUnredirectDisabled(false);
 
-        /*
-         * A Clutter grab must be dismissed before its actor or captured
-         * event handler is destroyed.
-         */
+        // Release the Clutter grab before destroying its actor.
         this._cancelDrag(false);
         this._removeEditKeybindings();
 
@@ -470,10 +441,8 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragPreviewAnchorRight = null;
     }
 
-
     _buildUi() {
         this._root = new St.BoxLayout({
-            style_class: 'dvo-root',
             vertical: true,
 
             reactive: false,
@@ -497,7 +466,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._applySavedPosition();
 
-
         this._toolbar = new St.BoxLayout({
             style_class: 'dvo-toolbar',
             vertical: true,
@@ -519,7 +487,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 this._dragHandle = null;
             }
         );
-
 
         this._dragHandle = new St.BoxLayout({
             style_class: 'dvo-drag-handle',
@@ -564,7 +531,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 this._onDragRelease(event)
         );
 
-
         this._overlayButton = new St.Button({
             style_class: 'dvo-control-button',
             x_expand: true,
@@ -589,7 +555,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 });
             }
         );
-
 
         this._speakingButton = new St.Button({
             style_class: 'dvo-control-button',
@@ -616,7 +581,6 @@ export default class DiscordVoiceOverlay extends Extension {
             }
         );
 
-
         this._ringButton = new St.Button({
             style_class: 'dvo-control-button',
             x_expand: true,
@@ -642,7 +606,6 @@ export default class DiscordVoiceOverlay extends Extension {
             }
         );
 
-
         this._avatarSizeBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
             vertical: false,
@@ -651,7 +614,6 @@ export default class DiscordVoiceOverlay extends Extension {
             can_focus: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-
 
         this._avatarSizeDownButton = new St.Button({
             label: '−',
@@ -667,7 +629,6 @@ export default class DiscordVoiceOverlay extends Extension {
             () => this._adjustAvatarSize(-AVATAR_SIZE_STEP)
         );
 
-
         this._avatarSizeLabel = new St.Label({
             style_class: 'dvo-size-label',
             reactive: false,
@@ -676,7 +637,6 @@ export default class DiscordVoiceOverlay extends Extension {
             can_focus: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-
 
         this._avatarSizeUpButton = new St.Button({
             label: '+',
@@ -692,7 +652,6 @@ export default class DiscordVoiceOverlay extends Extension {
             () => this._adjustAvatarSize(AVATAR_SIZE_STEP)
         );
 
-
         this._avatarSizeBox.add_child(
             this._avatarSizeDownButton
         );
@@ -704,7 +663,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._avatarSizeBox.add_child(
             this._avatarSizeUpButton
         );
-
 
         this._nameWidthBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
@@ -764,7 +722,6 @@ export default class DiscordVoiceOverlay extends Extension {
             this._nameWidthUpButton
         );
 
-
         this._maxUsersBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
             vertical: false,
@@ -823,7 +780,6 @@ export default class DiscordVoiceOverlay extends Extension {
             this._maxUsersUpButton
         );
 
-
         this._doneButton = new St.Button({
             label: 'Done',
             style_class: 'dvo-control-button',
@@ -837,7 +793,6 @@ export default class DiscordVoiceOverlay extends Extension {
             'clicked',
             () => this._setEditMode(false)
         );
-
 
         this._toolbar.add_child(
             this._dragHandle
@@ -870,7 +825,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._toolbar.add_child(
             this._doneButton
         );
-
 
         this._overlayDragHandle = new St.BoxLayout({
             style_class:
@@ -929,7 +883,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 this._onDragRelease(event)
         );
 
-
         this._userList = new St.BoxLayout({
             style_class: 'dvo-user-list',
             vertical: true,
@@ -938,25 +891,12 @@ export default class DiscordVoiceOverlay extends Extension {
             can_focus: false,
         });
 
-
-        /*
-         * The drag handle is separate Shell chrome. Keeping it outside
-         * this root means hiding edit mode cannot shift the user list.
-         */
+        // Keep the edit handle from affecting the user-list layout.
         this._root.add_child(
             this._userList
         );
 
-
-        /*
-         * addChrome() is inserted below Shell's top-window group.
-         * That made this actor visible during Alt+Tab but hidden
-         * behind the actual fullscreen game.
-         *
-         * addTopChrome() keeps it above fullscreen windows and popups.
-         * trackFullscreen must remain false, otherwise Shell itself
-         * hides the actor whenever that monitor is fullscreen.
-         */
+        // Top chrome stays above fullscreen windows; Shell must not hide it.
         Main.layoutManager.addTopChrome(
             this._root,
             {
@@ -981,10 +921,8 @@ export default class DiscordVoiceOverlay extends Extension {
             }
         );
 
-
         this._refreshControls();
     }
-
 
     _allowedWmClasses() {
         return new Set(
@@ -993,7 +931,6 @@ export default class DiscordVoiceOverlay extends Extension {
             )
         );
     }
-
 
     _windowIsAllowed(window) {
         if (!window)
@@ -1009,7 +946,6 @@ export default class DiscordVoiceOverlay extends Extension {
         );
     }
 
-
     _focusedGameWindow() {
         const window =
             global.display.focus_window;
@@ -1019,11 +955,9 @@ export default class DiscordVoiceOverlay extends Extension {
             : null;
     }
 
-
     _gameIsFocused() {
         return this._focusedGameWindow() !== null;
     }
-
 
     _setUnredirectDisabled(disabled) {
         disabled = Boolean(disabled);
@@ -1073,13 +1007,11 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _syncUnredirect() {
         this._setUnredirectDisabled(
             this._gameIsFocused()
         );
     }
-
 
     _syncKeybinding() {
         if (!this._settings)
@@ -1087,7 +1019,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         const shouldRegister =
             this._gameIsFocused();
-
 
         if (
             shouldRegister
@@ -1120,7 +1051,6 @@ export default class DiscordVoiceOverlay extends Extension {
             return;
         }
 
-
         if (
             !shouldRegister
             && this._keybindingRegistered
@@ -1132,7 +1062,6 @@ export default class DiscordVoiceOverlay extends Extension {
             this._keybindingRegistered = false;
         }
     }
-
 
     _captureEditState() {
         return {
@@ -1202,7 +1131,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 ),
         };
     }
-
 
     _applyEditState(snapshot) {
         if (!this._settings || !snapshot)
@@ -1292,7 +1220,6 @@ export default class DiscordVoiceOverlay extends Extension {
             this._placeOverlayDragHandle();
     }
 
-
     _performEdit(callback) {
         callback();
 
@@ -1302,7 +1229,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
         }
     }
-
 
     _undoEdit() {
         if (!this._editMode || !this._editHistory)
@@ -1320,7 +1246,6 @@ export default class DiscordVoiceOverlay extends Extension {
             this._applyEditState(snapshot);
     }
 
-
     _redoEdit() {
         if (
             !this._editMode
@@ -1336,7 +1261,6 @@ export default class DiscordVoiceOverlay extends Extension {
         if (snapshot)
             this._applyEditState(snapshot);
     }
-
 
     _registerEditKeybindings() {
         if (
@@ -1390,7 +1314,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _removeEditKeybindings() {
         if (!this._editKeybindings)
             return;
@@ -1409,7 +1332,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._editKeybindings.clear();
     }
 
-
     _setEditMode(enabled, discardChanges = false) {
         enabled = Boolean(enabled);
 
@@ -1422,7 +1344,6 @@ export default class DiscordVoiceOverlay extends Extension {
         ) {
             return;
         }
-
 
         if (enabled) {
             this._editHistory =
@@ -1452,22 +1373,14 @@ export default class DiscordVoiceOverlay extends Extension {
         if (enabled)
             this._registerEditKeybindings();
 
-        if (this._overlayDragHandle)
-            this._overlayDragHandle.visible = enabled;
-
-        if (this._toolbar)
-            this._toolbar.visible = enabled;
-
         if (enabled)
             this._schedulePositionRefresh();
-
 
         this._refreshControls();
 
         this._lastRenderState = null;
         this._tick(true);
     }
-
 
     _refreshControls() {
         if (
@@ -1487,7 +1400,6 @@ export default class DiscordVoiceOverlay extends Extension {
         ) {
             return;
         }
-
 
         const overlayEnabled =
             this._settings.get_boolean(
@@ -1519,7 +1431,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 'max-visible-users'
             );
 
-
         this._overlayButton.label =
             overlayEnabled
                 ? 'Overlay: ON'
@@ -1535,24 +1446,20 @@ export default class DiscordVoiceOverlay extends Extension {
                 ? 'Ring: INSIDE'
                 : 'Ring: OUTSIDE';
 
-
         if (overlayEnabled)
             this._overlayButton.add_style_class_name('dvo-control-on');
         else
             this._overlayButton.remove_style_class_name('dvo-control-on');
-
 
         if (speakingOnly)
             this._speakingButton.add_style_class_name('dvo-control-on');
         else
             this._speakingButton.remove_style_class_name('dvo-control-on');
 
-
         if (ringInside)
             this._ringButton.add_style_class_name('dvo-control-on');
         else
             this._ringButton.remove_style_class_name('dvo-control-on');
-
 
         this._avatarSizeLabel.text =
             `Avatar ${avatarSize}px`;
@@ -1575,7 +1482,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._avatarSizeUpButton.reactive = canGrow;
         this._avatarSizeUpButton.opacity = canGrow ? 255 : 110;
     }
-
 
     _adjustAvatarSize(delta) {
         if (!this._settings)
@@ -1607,7 +1513,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _changeNameMaxWidth(delta) {
         const current =
             this._settings.get_int(
@@ -1635,7 +1540,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _changeMaxVisibleUsers(delta) {
         const current =
             this._settings.get_int(
@@ -1662,7 +1566,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
         }
     }
-
 
     _ensureGlobalOverlayPosition() {
         if (
@@ -1719,7 +1622,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _monitorForPoint(x, y) {
         const monitors =
             Main.layoutManager.monitors ?? [];
@@ -1733,7 +1635,6 @@ export default class DiscordVoiceOverlay extends Extension {
         );
     }
 
-
     _monitorForActor(actor) {
         if (!actor)
             return null;
@@ -1746,7 +1647,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 + Math.max(actor.height, 1) / 2
         );
     }
-
 
     _fitActorToMonitor(
         actor,
@@ -1778,7 +1678,6 @@ export default class DiscordVoiceOverlay extends Extension {
             OVERLAY_MARGIN
         );
     }
-
 
     _applySavedPosition() {
         if (
@@ -1837,7 +1736,6 @@ export default class DiscordVoiceOverlay extends Extension {
         );
     }
 
-
     _applyPalettePosition() {
         if (
             !this._toolbar
@@ -1885,7 +1783,6 @@ export default class DiscordVoiceOverlay extends Extension {
             Math.round(y)
         );
     }
-
 
     _placePaletteNearOverlay() {
         if (
@@ -1963,7 +1860,6 @@ export default class DiscordVoiceOverlay extends Extension {
         }
     }
 
-
     _overlayAnchorsRight() {
         if (
             this._dragging
@@ -1980,7 +1876,6 @@ export default class DiscordVoiceOverlay extends Extension {
             )
         );
     }
-
 
     _placeOverlayDragHandle(
         preferredMonitor = null
@@ -2033,12 +1928,7 @@ export default class DiscordVoiceOverlay extends Extension {
         const anchorRight =
             this._overlayAnchorsRight();
 
-        /*
-         * Align the handle to the overlay's stable outer edge. Unlike
-         * centring, this does not move when the user list becomes wider,
-         * narrower, or temporarily empty. Prefer placing it above the
-         * rows, but use the space below near the monitor's top edge.
-         */
+        // The stable outer edge does not shift when the list width changes.
         const preferredX =
             alignedDragHandleX(
                 this._root.x,
@@ -2077,13 +1967,7 @@ export default class DiscordVoiceOverlay extends Extension {
         );
     }
 
-
     _schedulePositionRefresh() {
-        /*
-         * Never restore saved coordinates while either actor is being
-         * dragged. A callback queued before the drag also checks again
-         * before changing any position.
-         */
         if (
             this._dragging
             || this._positionIdleId
@@ -2112,7 +1996,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
     }
 
-
     _beginDrag(event, target, kind, grabActor) {
         if (
             !this._editMode
@@ -2130,10 +2013,6 @@ export default class DiscordVoiceOverlay extends Extension {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        /*
-         * Cancel position fitting that may have been queued immediately
-         * before the pointer press.
-         */
         if (this._positionIdleId) {
             GLib.source_remove(
                 this._positionIdleId
@@ -2145,11 +2024,7 @@ export default class DiscordVoiceOverlay extends Extension {
         const [pointerX, pointerY] =
             event.get_coords();
 
-        /*
-         * Keep receiving motion and release events when the pointer moves
-         * faster than the handle or leaves a window surface. Without an
-         * explicit grab, the release can be lost and leave a stale drag.
-         */
+        // A grab keeps events flowing when the pointer outruns the handle.
         try {
             this._dragGrab =
                 global.stage.grab(grabActor);
@@ -2215,10 +2090,7 @@ export default class DiscordVoiceOverlay extends Extension {
                         );
                     }
 
-                    /*
-                     * Never leave Shell input grabbed if a compositor or
-                     * device edge case prevents the release signal.
-                     */
+                    // Recover if the compositor loses the release event.
                     this._dragWatchdogId = null;
                     this._completeDrag();
 
@@ -2228,7 +2100,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         return Clutter.EVENT_STOP;
     }
-
 
     _finishDrag(pointerX, pointerY) {
         const target =
@@ -2240,11 +2111,7 @@ export default class DiscordVoiceOverlay extends Extension {
         if (!target)
             return;
 
-        /*
-         * The pointer is the user's destination. Actor-centre based
-         * selection can choose the old monitor while a wide actor is
-         * crossing a display boundary and snap it backwards.
-         */
+        // The pointer selects the destination monitor between displays.
         const monitor =
             (
                 Number.isFinite(pointerX)
@@ -2335,7 +2202,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
     }
 
-
     _clearDrag() {
         if (this._dragWatchdogId) {
             GLib.source_remove(
@@ -2370,7 +2236,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragTargetStartY = 0;
         this._dragPreviewAnchorRight = null;
     }
-
 
     _cancelDrag(restorePosition) {
         if (
@@ -2415,7 +2280,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._schedulePositionRefresh();
     }
-
 
     _completeDrag(
         pointerX,
@@ -2462,7 +2326,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._schedulePositionRefresh();
     }
 
-
     _onDragMotion(event) {
         if (
             !this._dragging
@@ -2480,10 +2343,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 & Clutter.ModifierType.BUTTON1_MASK
             )
         ) {
-            /*
-             * Keep the last valid position rather than snapping to a
-             * later unpressed pointer coordinate.
-             */
             this._completeDrag();
 
             return Clutter.EVENT_STOP;
@@ -2505,7 +2364,6 @@ export default class DiscordVoiceOverlay extends Extension {
         return Clutter.EVENT_STOP;
     }
 
-
     _onDragRelease(event) {
         if (
             !this._dragging
@@ -2524,10 +2382,7 @@ export default class DiscordVoiceOverlay extends Extension {
         const [pointerX, pointerY] =
             event.get_coords();
 
-        /*
-         * A release can arrive without a final motion event. Apply its
-         * coordinates before fitting and persisting the actor.
-         */
+        // A release may arrive without a final motion event.
         this._completeDrag(
             pointerX,
             pointerY,
@@ -2536,7 +2391,6 @@ export default class DiscordVoiceOverlay extends Extension {
 
         return Clutter.EVENT_STOP;
     }
-
 
     _setDraggedPosition(
         x,
@@ -2547,11 +2401,7 @@ export default class DiscordVoiceOverlay extends Extension {
         if (!this._dragTarget)
             return;
 
-        /*
-         * Do not clamp during motion. This allows an actor to cross
-         * monitor boundaries. It is fitted to the destination monitor
-         * when the mouse button is released.
-         */
+        // Fit only on release so the actor can cross monitor boundaries.
         this._dragTarget.set_position(
             Math.round(x),
             Math.round(y)
@@ -2569,7 +2419,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
         }
     }
-
 
     _updateOverlayDragPreview(
         pointerX,
@@ -2625,7 +2474,6 @@ export default class DiscordVoiceOverlay extends Extension {
         return monitor;
     }
 
-
     _focusedMonitor() {
         const window =
             this._focusedGameWindow();
@@ -2667,11 +2515,9 @@ export default class DiscordVoiceOverlay extends Extension {
         );
     }
 
-
     _readRawState() {
         if (!this._statePath)
             return null;
-
 
         try {
             const file =
@@ -2685,14 +2531,12 @@ export default class DiscordVoiceOverlay extends Extension {
             if (!ok)
                 return null;
 
-
             return new TextDecoder()
                 .decode(contents);
         } catch {
             return null;
         }
     }
-
 
     _scheduleStateExpiry(delay) {
         if (this._stateExpiryId) {
@@ -2722,7 +2566,6 @@ export default class DiscordVoiceOverlay extends Extension {
             );
     }
 
-
     _tick(force) {
         if (!this._root)
             return;
@@ -2734,16 +2577,19 @@ export default class DiscordVoiceOverlay extends Extension {
             gameWindow !== null
         );
 
+        const editChromeVisible =
+            gameWindow !== null
+            && this._editMode;
+
+        if (this._toolbar)
+            this._toolbar.visible = editChromeVisible;
+
+        if (this._overlayDragHandle)
+            this._overlayDragHandle.visible = editChromeVisible;
+
         if (!gameWindow) {
             this._scheduleStateExpiry(null);
             this._root.hide();
-
-            if (this._toolbar)
-                this._toolbar.hide();
-
-            if (this._overlayDragHandle)
-                this._overlayDragHandle.hide();
-
             return;
         }
 
@@ -2757,7 +2603,6 @@ export default class DiscordVoiceOverlay extends Extension {
                 monitorIndex;
         }
 
-
         const raw =
             this._readRawState();
 
@@ -2769,7 +2614,6 @@ export default class DiscordVoiceOverlay extends Extension {
         this._scheduleStateExpiry(
             expiryDelay
         );
-
 
         const overlayEnabled =
             this._settings.get_boolean(
@@ -2804,16 +2648,11 @@ export default class DiscordVoiceOverlay extends Extension {
         const anchorRight =
             this._overlayAnchorsRight();
 
-
-        const users =
-            Array.isArray(state.users)
-                ? state.users.filter(
-                    user =>
-                        !speakingOnly
-                        || Boolean(user.speaking)
-                )
-                : [];
-
+        const users = state.users.filter(
+            user =>
+                !speakingOnly
+                || Boolean(user.speaking)
+        );
 
         const renderState = [
             raw,
@@ -2836,7 +2675,6 @@ export default class DiscordVoiceOverlay extends Extension {
                     !== this._lastRenderState[index]
             );
 
-
         if (
             force
             || renderChanged
@@ -2852,8 +2690,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
             this._userListRenderer?.render({
                 users,
-                stateConnected:
-                    Boolean(state.connected),
+                stateConnected: state.connected,
                 overlayEnabled,
                 editMode: this._editMode,
                 speakingOnly,
@@ -2868,21 +2705,10 @@ export default class DiscordVoiceOverlay extends Extension {
             });
         }
 
-
         if (this._editMode) {
             this._root.show();
-            this._toolbar.show();
-
-            if (this._overlayDragHandle)
-                this._overlayDragHandle.show();
-
             return;
         }
-
-        this._toolbar.hide();
-
-        if (this._overlayDragHandle)
-            this._overlayDragHandle.hide();
 
         const shouldShow =
             overlayEnabled

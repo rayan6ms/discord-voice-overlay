@@ -3,14 +3,12 @@
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 
-
 function cleanIdentifier(value) {
     if (typeof value !== 'string')
         return '';
 
     return value.trim();
 }
-
 
 function optionalCall(object, methodName) {
     try {
@@ -21,20 +19,12 @@ function optionalCall(object, methodName) {
 
         return method.call(object);
     } catch {
-        /*
-         * A single unusual or disappearing MetaWindow must not break
-         * focus matching or the application picker.
-         */
+        // Windows can disappear while the picker inspects them.
         return null;
     }
 }
 
-
-/*
- * Keep application picking and focus matching on the exact same set of
- * identifiers. The first value is the preferred display identifier, while
- * every value is added when an application is enabled from Preferences.
- */
+// Picking and focus matching must use the same identifiers.
 export function windowIdentityCandidates(window) {
     if (!window)
         return [];
@@ -55,7 +45,6 @@ export function windowIdentityCandidates(window) {
     ];
 }
 
-
 export function focusedWindowIdentity() {
     return (
         windowIdentityCandidates(
@@ -64,7 +53,6 @@ export function focusedWindowIdentity() {
         ?? ''
     );
 }
-
 
 function openWindows() {
     const windows = [];
@@ -92,10 +80,7 @@ function openWindows() {
         );
     }
 
-    /*
-     * Keep a compositor-actor fallback for Shell/Mutter revisions where
-     * a newly mapped window has not yet appeared in list_all_windows().
-     */
+    // Newly mapped windows may appear as actors before list_all_windows().
     try {
         for (
             const actor
@@ -115,7 +100,6 @@ function openWindows() {
 
     return windows;
 }
-
 
 export function listOpenApplicationsJson(
     protocolVersion,
@@ -175,10 +159,7 @@ export function listOpenApplicationsJson(
             app =
                 tracker.get_window_app(window);
         } catch {
-            /*
-             * Keep the window pickable by its Meta identifiers even if
-             * Shell cannot associate it with a desktop application.
-             */
+            // Meta identifiers still make the window pickable.
         }
 
         const rawDesktopId =
@@ -186,11 +167,7 @@ export function listOpenApplicationsJson(
                 optionalCall(app, 'get_id')
             );
 
-        /*
-         * Shell uses transient window:<id> identifiers for applications
-         * without a desktop file. They are useful as grouping keys only,
-         * not as persistent application metadata.
-         */
+        // A transient window:<id> is a grouping key, not persistent metadata.
         const desktopId =
             rawDesktopId.startsWith('window:')
                 ? ''
