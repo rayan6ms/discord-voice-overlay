@@ -56,5 +56,7 @@ printf 'Then enable it with:\n  gnome-extensions enable %s\n' "$UUID"
 LEGACY_DIR="$DATA_HOME/gnome-shell/extensions/$LEGACY_UUID"
 if [ -d "$LEGACY_DIR" ]; then
     printf '\nA pre-release installation using %s still exists.\n' "$LEGACY_UUID"
-    printf 'Disable and remove it after confirming this release works; see README.md.\n'
+    printf 'After confirming this release works, disable it with:\n'
+    printf '  gnome-extensions disable %s\n' "$LEGACY_UUID"
+    printf 'Then delete its directory:\n  %s\n' "$LEGACY_DIR"
 fi

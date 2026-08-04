@@ -2,6 +2,16 @@
 
 All notable public changes are documented here.
 
+## [1.0.9] - 2026-08-04
+
+GNOME extension metadata version: 28.
+
+### Changed
+
+- Streamline position updates and edit-control visibility while preserving overlay behavior.
+- Stop publishing unused channel metadata, remove unused style hooks, and make checks discover JavaScript modules and tests automatically.
+- Align user-facing terminology and privacy details, and remove redundant comments and whitespace.
+
 ## [1.0.8] - 2026-08-03
 
 GNOME extension metadata version: 27.
@@ -200,3 +210,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.6]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.6
 [1.0.7]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.7
 [1.0.8]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.8
+[1.0.9]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.9

@@ -5,15 +5,12 @@ export const STATE_STALE_AFTER_MS = 45_000;
 
 const STATE_FUTURE_TOLERANCE_MS = 5_000;
 
-
 export function emptyState() {
     return {
         connected: false,
-        channel: null,
         users: [],
     };
 }
-
 
 export function stateTimestampIsFresh(
     publishedAt,
@@ -33,7 +30,6 @@ export function stateTimestampIsFresh(
         && age <= STATE_STALE_AFTER_MS
     );
 }
-
 
 export function readState(
     raw,
@@ -92,12 +88,6 @@ export function readState(
             state: {
                 connected:
                     Boolean(parsed.connected),
-                channel:
-                    parsed.channel
-                    && typeof parsed.channel === 'object'
-                    && !Array.isArray(parsed.channel)
-                        ? parsed.channel
-                        : null,
                 users:
                     Array.isArray(parsed.users)
                         ? parsed.users.filter(
@@ -118,14 +108,12 @@ export function readState(
     }
 }
 
-
 export function stateExpiryDelay(
     raw,
     now = Date.now()
 ) {
     return readState(raw, now).expiryDelay;
 }
-
 
 export function parseState(
     raw,

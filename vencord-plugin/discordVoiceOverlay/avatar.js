@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/**
- * Return only custom avatar URLs.
- *
- * Discord's getAvatarURL() also returns a generated CDN URL when a user
- * has no avatar. GNOME Shell cannot report failures from CSS background
- * images, so those URLs could leave a transparent actor behind. An empty
- * value tells the extension to use its local, always-available fallback
- * icon instead.
- */
+// Empty means use the local fallback instead of a generated default-avatar URL.
 export function getAvatarUrl(user) {
     if (!user?.avatar)
         return "";
@@ -24,9 +16,7 @@ export function getAvatarUrl(user) {
             if (url)
                 return String(url);
         }
-    } catch {
-        // Fall through to constructing the custom-avatar CDN URL.
-    }
+    } catch {}
 
     const extension =
         String(user.avatar).startsWith("a_")

@@ -4,7 +4,6 @@ function copySnapshot(snapshot) {
     return {...snapshot};
 }
 
-
 function snapshotsEqual(left, right) {
     const leftKeys = Object.keys(left);
     const rightKeys = Object.keys(right);
@@ -18,7 +17,6 @@ function snapshotsEqual(left, right) {
             && left[key] === right[key]
     );
 }
-
 
 export class EditHistory {
     constructor(initialSnapshot, limit = 100) {
@@ -49,21 +47,17 @@ export class EditHistory {
         this._redoStack = [];
     }
 
-
     get canUndo() {
         return this._undoStack.length > 0;
     }
-
 
     get canRedo() {
         return this._redoStack.length > 0;
     }
 
-
     initial() {
         return copySnapshot(this._initial);
     }
-
 
     record(snapshot) {
         if (snapshotsEqual(snapshot, this._current))
@@ -83,7 +77,6 @@ export class EditHistory {
         return true;
     }
 
-
     undo() {
         if (!this.canUndo)
             return null;
@@ -97,7 +90,6 @@ export class EditHistory {
 
         return copySnapshot(this._current);
     }
-
 
     redo() {
         if (!this.canRedo)

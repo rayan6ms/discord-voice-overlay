@@ -3,9 +3,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-
 const FALLBACK_INTERVAL_MS = 1_000;
-
 
 function fileMatches(left, right) {
     try {
@@ -18,7 +16,6 @@ function fileMatches(left, right) {
         return false;
     }
 }
-
 
 export class StateMonitor {
     constructor(statePath, onChange) {
@@ -34,7 +31,6 @@ export class StateMonitor {
         this._pendingId = null;
         this._fallbackId = null;
     }
-
 
     start() {
         if (this._monitor || this._fallbackId)
@@ -97,7 +93,6 @@ export class StateMonitor {
         }
     }
 
-
     stop() {
         if (this._pendingId) {
             GLib.source_remove(this._pendingId);
@@ -126,7 +121,6 @@ export class StateMonitor {
         this._monitor = null;
     }
 
-
     _queueChange() {
         if (this._pendingId)
             return;
@@ -141,7 +135,6 @@ export class StateMonitor {
                 }
             );
     }
-
 
     _startFallback() {
         if (this._fallbackId)

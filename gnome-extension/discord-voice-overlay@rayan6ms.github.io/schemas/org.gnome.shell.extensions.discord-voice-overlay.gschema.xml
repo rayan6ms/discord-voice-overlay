@@ -43,7 +43,7 @@
     <key name="name-max-width" type="i">
       <range min="80" max="320"/>
       <default>180</default>
-      <summary>Maximum displayed username width</summary>
+      <summary>Maximum displayed name width</summary>
     </key>
 
     <key name="max-visible-users" type="i">

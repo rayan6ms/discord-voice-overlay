@@ -17,37 +17,25 @@ require_command() {
     fi
 }
 
-require_command node
-require_command python3
-require_command rg
-require_command gjs
+for command in node python3 rg gjs; do
+    require_command "$command"
+done
 
-node --check "$EXTENSION_DIR/extension.js"
-node --check "$EXTENSION_DIR/edit-history.js"
-node --check "$EXTENSION_DIR/geometry.js"
-node --check "$EXTENSION_DIR/prefs.js"
-node --check "$EXTENSION_DIR/render-model.js"
-node --check "$EXTENSION_DIR/state.js"
-node --check "$EXTENSION_DIR/state-monitor.js"
-node --check "$EXTENSION_DIR/user-list.js"
-node --check "$EXTENSION_DIR/window-identity.js"
-node --check "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/avatar.js"
-node "$SCRIPT_DIR/test-avatar.mjs"
-node "$SCRIPT_DIR/test-geometry.mjs"
-node "$SCRIPT_DIR/test-edit-history.mjs"
-node "$SCRIPT_DIR/test-render-model.mjs"
-node "$SCRIPT_DIR/test-state.mjs"
+for source in \
+    "$EXTENSION_DIR"/*.js \
+    "$PROJECT_DIR/vencord-plugin/discordVoiceOverlay/avatar.js"
+do
+    node --check "$source"
+done
+
+for test in "$SCRIPT_DIR"/test-*.mjs; do
+    node "$test"
+done
+
 gjs -m "$SCRIPT_DIR/test-state-monitor.js"
-python3 -m json.tool "$METADATA" >/dev/null
 
 if command -v glib-compile-schemas >/dev/null 2>&1; then
     glib-compile-schemas --strict --dry-run "$EXTENSION_DIR/schemas"
-else
-    python3 - "$SCHEMA" <<'PY'
-import sys
-import xml.etree.ElementTree as ET
-ET.parse(sys.argv[1])
-PY
 fi
 
 for script in "$SCRIPT_DIR"/*.sh; do

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Clutter from 'gi://Clutter';
-import Gio from 'gi://Gio';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
@@ -12,26 +11,14 @@ import {
     visibleUserLayout,
 } from './render-model.js';
 
-
 const USER_ACTIVITY_FADE_MS = 150;
 
-
 function avatarCssUrl(value) {
-    let uri = String(value);
-
-    /*
-     * This accepts the current Discord CDN URLs and also supports
-     * ordinary local paths if the bridge later caches avatars.
-     */
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(uri))
-        uri = Gio.File.new_for_path(uri).get_uri();
-
-    return uri
+    return String(value)
         .replace(/\\/g, '\\\\')
         .replace(/"/g, '\\"')
         .replace(/[\r\n]/g, '');
 }
-
 
 function avatarActor(url, avatarSize) {
     if (url) {
@@ -42,12 +29,6 @@ function avatarActor(url, avatarSize) {
                 can_focus: false,
                 x_align: Clutter.ActorAlign.CENTER,
                 y_align: Clutter.ActorAlign.CENTER,
-
-                /*
-                 * Because this image is the actor's own themed
-                 * background, St applies border-radius directly to
-                 * the image instead of merely rounding a parent.
-                 */
                 style: `background-image: url("${avatarCssUrl(url)}");`,
             });
 
@@ -72,18 +53,16 @@ function avatarActor(url, avatarSize) {
     });
 }
 
-
-function createStatusIcon(gicon, styleClass) {
+function createStatusIcon(gicon) {
     return new St.Icon({
         gicon,
         icon_size: 12,
-        style_class: `dvo-status-icon ${styleClass}`,
+        style_class: 'dvo-status-icon',
         reactive: false,
         can_focus: false,
         y_align: Clutter.ActorAlign.CENTER,
     });
 }
-
 
 function cleanDisplayName(user) {
     const value =
@@ -99,7 +78,6 @@ function cleanDisplayName(user) {
 
     return cleaned || 'Unknown';
 }
-
 
 function createUserRow(
     user,
@@ -125,11 +103,7 @@ function createUserRow(
         );
 
     const row = new St.BoxLayout({
-        style_class:
-            anchorRight
-                ? 'dvo-user-row dvo-user-row-right'
-                : 'dvo-user-row',
-
+        style_class: 'dvo-user-row',
         vertical: false,
         x_expand: true,
         x_align: Clutter.ActorAlign.FILL,
@@ -144,7 +118,6 @@ function createUserRow(
 
     if (ringInside) {
         const avatarStack = new St.Widget({
-            style_class: 'dvo-avatar-stack',
             layout_manager: new Clutter.BinLayout(),
             width: avatarSize,
             height: avatarSize,
@@ -263,8 +236,7 @@ function createUserRow(
         if (statusIcons?.muted) {
             mutedIcon =
                 createStatusIcon(
-                    statusIcons.muted,
-                    'dvo-status-muted'
+                    statusIcons.muted
                 );
 
             decorations.push(mutedIcon);
@@ -273,29 +245,16 @@ function createUserRow(
         if (statusIcons?.deafened) {
             deafenedIcon =
                 createStatusIcon(
-                    statusIcons.deafened,
-                    'dvo-status-deafened'
+                    statusIcons.deafened
                 );
 
             decorations.push(deafenedIcon);
         }
     }
 
-    /*
-     * Keep the name adjacent to the avatar in either orientation.
-     *
-     * Left side:
-     *   avatar | name decorations
-     *
-     * Right side:
-     *   decorations name | avatar
-     */
+    // Keep the name beside the avatar in either orientation.
     if (anchorRight) {
-        /*
-         * Every row is allocated to the width of the widest row. Let a
-         * leading spacer absorb the difference so all avatars share the
-         * same right edge regardless of display-name length.
-         */
+        // The spacer aligns every avatar to the widest row's right edge.
         row.add_child(
             new St.Widget({
                 x_expand: true,
@@ -429,7 +388,6 @@ function createUserRow(
     };
 }
 
-
 export class UserListRenderer {
     constructor(
         container,
@@ -446,7 +404,6 @@ export class UserListRenderer {
         this._placeholder = null;
     }
 
-
     destroy() {
         this._destroyRowsExcept(new Set());
         this._destroyOverflow();
@@ -460,13 +417,8 @@ export class UserListRenderer {
         this._onSizeChanged = null;
     }
 
-
     abandon() {
-        /*
-         * GNOME Shell may dispose chrome actors before disable() during
-         * shutdown. Drop JavaScript references without touching disposed
-         * GObjects in that lifecycle path.
-         */
+        // Shell may dispose chrome actors before disable() during shutdown.
         this._rows.clear();
         this._overflowRow = null;
         this._overflowLabel = null;
@@ -476,7 +428,6 @@ export class UserListRenderer {
         this._statusIcons = null;
         this._onSizeChanged = null;
     }
-
 
     render({
         users,
@@ -684,7 +635,6 @@ export class UserListRenderer {
             this._onSizeChanged?.();
     }
 
-
     _updatePlaceholder(text, index) {
         if (!text) {
             if (!this._placeholder)
@@ -720,7 +670,6 @@ export class UserListRenderer {
         return changed;
     }
 
-
     _destroyRowsExcept(retainedRows) {
         let changed = false;
 
@@ -736,7 +685,6 @@ export class UserListRenderer {
         return changed;
     }
 
-
     _placeActor(actor, index) {
         if (actor.get_parent() !== this._container)
             this._container.add_child(actor);
@@ -746,7 +694,6 @@ export class UserListRenderer {
             index
         );
     }
-
 
     _ensureOverflow(anchorRight) {
         if (
@@ -797,7 +744,6 @@ export class UserListRenderer {
         this._overflowAnchorRight =
             anchorRight;
     }
-
 
     _destroyOverflow() {
         if (this._overflowRow)

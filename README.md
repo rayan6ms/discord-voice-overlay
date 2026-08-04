@@ -1,6 +1,6 @@
 # Discord Voice Overlay for GNOME
 
-See who is speaking in your Discord voice channel without leaving your game. The overlay shows avatars, names, speaking activity, mute/deafen status, and live streams over applications you choose.
+See who is speaking in your Discord voice channel without leaving your game. The overlay shows avatars, names, speaking activity, mute/deafen status, and streaming status over applications you choose.
 
 ![Discord Voice Overlay showing two people](docs/screenshots/overlay.png)
 ![Discord Voice Overlay showing mute, deafen, and live-stream status](docs/screenshots/overlay-with-icons.png)
@@ -123,10 +123,10 @@ Fully restart Discord afterward.
 
 ## Privacy
 
-DiscordVoiceOverlay writes voice-channel display data to `$XDG_RUNTIME_DIR/discord-voice-overlay/state.json`, readable only by your Linux user. The project has no server, telemetry, analytics, or update checker. GNOME Shell requests avatar images directly from Discord's CDN.
+DiscordVoiceOverlay writes voice-channel display data to `$XDG_RUNTIME_DIR/discord-voice-overlay/state.json`, readable only by your Linux user. The project has no server, telemetry, analytics, or update checker. GNOME Shell requests custom avatar images directly from Discord's CDN; default avatars use a local icon.
 
-The local state includes user IDs, display names, voice status, and avatar URLs. It is removed when the plugin stops cleanly and ignored by the extension if Discord exits without cleaning it up.
+The local state includes user IDs, display names, voice status, and avatar URLs. It is removed when the plugin stops cleanly. If Discord exits without removing it, the extension discards it after 45 seconds.
 
-## Licence
+## License
 
 This project is licensed under `GPL-3.0-or-later`. See [LICENSE](LICENSE).

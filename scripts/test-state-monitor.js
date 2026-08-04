@@ -130,7 +130,7 @@ for (const path of [
     try {
         GLib.unlink(path);
     } catch {
-        // The temporary file is moved during the successful path.
+        // Expected after the temporary file is renamed.
     }
 }
 

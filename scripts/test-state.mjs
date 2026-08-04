@@ -48,11 +48,6 @@ assert.deepEqual(
     {
         state: {
             connected: true,
-            channel: {
-                id: "voice",
-                name: "Voice",
-                guildId: "guild"
-            },
             users: [
                 {
                     id: "user"
@@ -111,7 +106,6 @@ assert.deepEqual(
     ),
     {
         connected: false,
-        channel: null,
         users: []
     }
 );
