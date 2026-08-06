@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Discord's pinned voice widget renders idle users at 30% opacity.
 export const IDLE_USER_OPACITY = 77;
-export const ACTIVE_USER_OPACITY = 255;
+export const ACTIVE_USER_OPACITY = 217;
 
 export function userVisualOpacity(active) {
     return active
@@ -42,6 +41,7 @@ export function userRowKey(
         ringInside,
         nameMaxWidth,
         anchorRight,
+        showNames = true,
     }
 ) {
     return JSON.stringify([
@@ -50,9 +50,10 @@ export function userRowKey(
         user.username,
         user.avatar,
         avatarSize,
-        speakingOnly,
+        showNames ? speakingOnly : null,
         ringInside,
-        nameMaxWidth,
+        showNames,
+        showNames ? nameMaxWidth : null,
         anchorRight,
     ]);
 }
@@ -65,6 +66,7 @@ export function visibleUserLayout(
         maxVisibleUsers,
         monitorHeight,
         overlayMargin,
+        showNames = true,
     }
 ) {
     const avatarOuterSize =
@@ -75,7 +77,7 @@ export function visibleUserLayout(
     const estimatedRowHeight =
         Math.max(
             avatarOuterSize,
-            24
+            showNames ? 24 : 0
         ) + 4;
 
     const rowsByHeight =

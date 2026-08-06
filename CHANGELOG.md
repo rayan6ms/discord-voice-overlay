@@ -2,6 +2,20 @@
 
 All notable public changes are documented here.
 
+## [1.0.10] - 2026-08-06
+
+GNOME extension metadata version: 29.
+
+### Added
+
+- Toggle names and status from extension preferences or the in-game toolbar for an avatar-and-ring-only layout.
+
+### Changed
+
+- Keep speaking avatars and names slightly translucent while preserving a clear brightness increase over idle users and a fully visible speaking ring.
+- Match Discord's current LIVE badge sizing, spacing, rounded shape, typography, and red color.
+- Fit more users in avatar-only mode and avoid rebuilding retained rows for hidden name settings.
+
 ## [1.0.9] - 2026-08-04
 
 GNOME extension metadata version: 28.
@@ -211,3 +225,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.7]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.7
 [1.0.8]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.8
 [1.0.9]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.9
+[1.0.10]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.10

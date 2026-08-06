@@ -150,6 +150,21 @@ export default class DiscordVoiceOverlayPreferences
             Gio.SettingsBindFlags.DEFAULT
         );
 
+        const showNamesRow = new Adw.SwitchRow({
+            title: _('Show names'),
+            subtitle:
+                _('Show display names and status beside avatars.'),
+        });
+
+        behaviorGroup.add(showNamesRow);
+
+        settings.bind(
+            'show-names',
+            showNamesRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT
+        );
+
         const ringRow = new Adw.SwitchRow({
             title: _('Speaking ring inside avatar'),
             subtitle:
@@ -186,6 +201,17 @@ export default class DiscordVoiceOverlayPreferences
         });
 
         behaviorGroup.add(nameWidthRow);
+
+        nameWidthRow.sensitive =
+            showNamesRow.active;
+
+        showNamesRow.connect(
+            'notify::active',
+            () => {
+                nameWidthRow.sensitive =
+                    showNamesRow.active;
+            }
+        );
 
         nameWidthRow.connect(
             'notify::value',

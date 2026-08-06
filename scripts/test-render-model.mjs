@@ -27,6 +27,7 @@ const rowOptions = {
     ringInside: false,
     nameMaxWidth: 180,
     anchorRight: false,
+    showNames: true,
 };
 
 assert.equal(
@@ -43,6 +44,12 @@ assert.equal(
 assert.equal(
     userVisualOpacity(true),
     ACTIVE_USER_OPACITY
+);
+
+assert.equal(
+    ACTIVE_USER_OPACITY,
+    217,
+    'speaking users should remain slightly translucent'
 );
 
 assert.equal(
@@ -143,6 +150,41 @@ assert.notEqual(
     'an avatar change must replace only that user row'
 );
 
+const hiddenNameOptions = {
+    ...rowOptions,
+    showNames: false,
+};
+
+assert.notEqual(
+    userRowKey(users[0], rowOptions),
+    userRowKey(users[0], hiddenNameOptions),
+    'toggling names must rebuild the row layout'
+);
+
+assert.equal(
+    userRowKey(users[0], hiddenNameOptions),
+    userRowKey(
+        users[0],
+        {
+            ...hiddenNameOptions,
+            nameMaxWidth: 320,
+        }
+    ),
+    'hidden name width must not invalidate avatar-only rows'
+);
+
+assert.equal(
+    userRowKey(users[0], hiddenNameOptions),
+    userRowKey(
+        users[0],
+        {
+            ...hiddenNameOptions,
+            speakingOnly: true,
+        }
+    ),
+    'speaking-only mode must not rebuild retained avatar-only rows'
+);
+
 assert.deepEqual(
     visibleUserLayout(
         users,
@@ -182,6 +224,25 @@ assert.equal(
 assert.equal(
     constrained.hiddenCount,
     9
+);
+
+const avatarOnly =
+    visibleUserLayout(
+        users,
+        {
+            avatarSize: 20,
+            ringInside: true,
+            maxVisibleUsers: 10,
+            monitorHeight: 120,
+            overlayMargin: 8,
+            showNames: false,
+        }
+    );
+
+assert.equal(
+    avatarOnly.visibleUsers.length,
+    2,
+    'avatar-only rows should use their smaller height'
 );
 
 console.log('Render model tests passed.');

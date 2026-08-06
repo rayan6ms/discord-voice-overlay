@@ -50,7 +50,7 @@ const UNDO_EDIT_KEYBINDING = 'undo-edit';
 const REDO_EDIT_KEYBINDING = 'redo-edit';
 const EDIT_HISTORY_LIMIT = 100;
 const DRAG_WATCHDOG_MS = 100;
-const EXTENSION_VERSION = 28;
+const EXTENSION_VERSION = 29;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const OVERLAY_POSITION_KEYS = new Set([
@@ -220,6 +220,7 @@ export default class DiscordVoiceOverlay extends Extension {
         for (const key of [
             'overlay-enabled',
             'speaking-only',
+            'show-names',
             'ring-inside',
             'avatar-size',
             'name-max-width',
@@ -393,6 +394,7 @@ export default class DiscordVoiceOverlay extends Extension {
         this._dragHandle = null;
         this._overlayButton = null;
         this._speakingButton = null;
+        this._namesButton = null;
         this._ringButton = null;
 
         this._avatarSizeBox = null;
@@ -575,6 +577,31 @@ export default class DiscordVoiceOverlay extends Extension {
 
                     this._settings.set_boolean(
                         'speaking-only',
+                        value
+                    );
+                });
+            }
+        );
+
+        this._namesButton = new St.Button({
+            style_class: 'dvo-control-button',
+            x_expand: true,
+            reactive: true,
+            can_focus: true,
+            track_hover: true,
+        });
+
+        this._namesButton.connect(
+            'clicked',
+            () => {
+                this._performEdit(() => {
+                    const value =
+                        !this._settings.get_boolean(
+                            'show-names'
+                        );
+
+                    this._settings.set_boolean(
+                        'show-names',
                         value
                     );
                 });
@@ -804,6 +831,10 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._toolbar.add_child(
             this._speakingButton
+        );
+
+        this._toolbar.add_child(
+            this._namesButton
         );
 
         this._toolbar.add_child(
@@ -1075,6 +1106,11 @@ export default class DiscordVoiceOverlay extends Extension {
                     'speaking-only'
                 ),
 
+            showNames:
+                this._settings.get_boolean(
+                    'show-names'
+                ),
+
             ringInside:
                 this._settings.get_boolean(
                     'ring-inside'
@@ -1148,6 +1184,11 @@ export default class DiscordVoiceOverlay extends Extension {
             this._settings.set_boolean(
                 'speaking-only',
                 snapshot.speakingOnly
+            );
+
+            this._settings.set_boolean(
+                'show-names',
+                snapshot.showNames
             );
 
             this._settings.set_boolean(
@@ -1387,6 +1428,7 @@ export default class DiscordVoiceOverlay extends Extension {
             !this._settings
             || !this._overlayButton
             || !this._speakingButton
+            || !this._namesButton
             || !this._ringButton
             || !this._avatarSizeLabel
             || !this._avatarSizeDownButton
@@ -1409,6 +1451,11 @@ export default class DiscordVoiceOverlay extends Extension {
         const speakingOnly =
             this._settings.get_boolean(
                 'speaking-only'
+            );
+
+        const showNames =
+            this._settings.get_boolean(
+                'show-names'
             );
 
         const ringInside =
@@ -1441,6 +1488,11 @@ export default class DiscordVoiceOverlay extends Extension {
                 ? 'Speaking only: ON'
                 : 'Speaking only: OFF';
 
+        this._namesButton.label =
+            showNames
+                ? 'Names: ON'
+                : 'Names: OFF';
+
         this._ringButton.label =
             ringInside
                 ? 'Ring: INSIDE'
@@ -1456,6 +1508,11 @@ export default class DiscordVoiceOverlay extends Extension {
         else
             this._speakingButton.remove_style_class_name('dvo-control-on');
 
+        if (showNames)
+            this._namesButton.add_style_class_name('dvo-control-on');
+        else
+            this._namesButton.remove_style_class_name('dvo-control-on');
+
         if (ringInside)
             this._ringButton.add_style_class_name('dvo-control-on');
         else
@@ -1466,6 +1523,9 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._nameWidthLabel.text =
             `Name ${nameMaxWidth}px`;
+
+        this._nameWidthBox.visible =
+            showNames;
 
         this._maxUsersLabel.text =
             `Users ${maxVisibleUsers}`;
@@ -2625,6 +2685,11 @@ export default class DiscordVoiceOverlay extends Extension {
                 'speaking-only'
             );
 
+        const showNames =
+            this._settings.get_boolean(
+                'show-names'
+            );
+
         const ringInside =
             this._settings.get_boolean(
                 'ring-inside'
@@ -2659,6 +2724,7 @@ export default class DiscordVoiceOverlay extends Extension {
             state.connected,
             overlayEnabled,
             speakingOnly,
+            showNames,
             ringInside,
             avatarSize,
             nameMaxWidth,
@@ -2694,6 +2760,7 @@ export default class DiscordVoiceOverlay extends Extension {
                 overlayEnabled,
                 editMode: this._editMode,
                 speakingOnly,
+                showNames,
                 ringInside,
                 avatarSize,
                 nameMaxWidth,

@@ -87,7 +87,8 @@ function createUserRow(
     nameMaxWidth,
     anchorRight,
     statusIcons,
-    editMode
+    editMode,
+    showNames
 ) {
     const avatarOuterSize =
         ringInside
@@ -99,7 +100,9 @@ function createUserRow(
     const rowHeight =
         Math.max(
             avatarOuterSize,
-            namePlateHeight
+            showNames
+                ? namePlateHeight
+                : 0
         );
 
     const row = new St.BoxLayout({
@@ -115,6 +118,11 @@ function createUserRow(
     let avatarContainer;
     let insideRing = null;
     let avatarFrame = null;
+    const avatar =
+        avatarActor(
+            user.avatar,
+            avatarSize
+        );
 
     if (ringInside) {
         const avatarStack = new St.Widget({
@@ -125,12 +133,6 @@ function createUserRow(
             can_focus: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-
-        const avatar =
-            avatarActor(
-                user.avatar,
-                avatarSize
-            );
 
         avatar.x_align =
             Clutter.ActorAlign.CENTER;
@@ -173,125 +175,130 @@ function createUserRow(
             });
 
         avatarFrame.set_child(
-            avatarActor(
-                user.avatar,
-                avatarSize
-            )
+            avatar
         );
 
         avatarContainer = avatarFrame;
     }
 
-    const namePlate = new St.BoxLayout({
-        style_class: 'dvo-name-plate',
-        vertical: false,
-        reactive: false,
-        can_focus: false,
-        height: namePlateHeight,
-        y_align: Clutter.ActorAlign.CENTER,
-    });
-
     const displayName =
         cleanDisplayName(user);
 
-    const name = new St.Label({
-        text: displayName,
-        style_class: 'dvo-name',
-        style: `max-width: ${nameMaxWidth}px;`,
+    row.set_accessible_name(displayName);
+
+    let namePlate = null;
+    let liveBadge = null;
+
+    let mutedIcon = null;
+    let deafenedIcon = null;
+
+    const spacer = new St.Widget({
+        x_expand: true,
         reactive: false,
         can_focus: false,
-        y_align: Clutter.ActorAlign.CENTER,
     });
 
-    name.set_accessible_name(displayName);
+    if (showNames) {
+        namePlate = new St.BoxLayout({
+            style_class: 'dvo-name-plate',
+            vertical: false,
+            reactive: false,
+            can_focus: false,
+            height: namePlateHeight,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
 
-    name.clutter_text.set_single_line_mode(true);
-    name.clutter_text.set_ellipsize(
-        Pango.EllipsizeMode.END
-    );
-
-    name.clutter_text.set_line_alignment(
-        anchorRight
-            ? Pango.Alignment.RIGHT
-            : Pango.Alignment.LEFT
-    );
-
-    const decorations = [];
-
-    const liveBadge =
-        new St.Label({
-            text: 'LIVE',
-            style_class: 'dvo-live-badge',
+        const name = new St.Label({
+            text: displayName,
+            style_class: 'dvo-name',
+            style: `max-width: ${nameMaxWidth}px;`,
             reactive: false,
             can_focus: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
 
-    decorations.push(liveBadge);
+        name.clutter_text.set_single_line_mode(true);
+        name.clutter_text.set_ellipsize(
+            Pango.EllipsizeMode.END
+        );
 
-    let mutedIcon = null;
-    let deafenedIcon = null;
+        name.clutter_text.set_line_alignment(
+            anchorRight
+                ? Pango.Alignment.RIGHT
+                : Pango.Alignment.LEFT
+        );
 
-    if (!speakingOnly) {
-        if (statusIcons?.muted) {
-            mutedIcon =
-                createStatusIcon(
-                    statusIcons.muted
-                );
+        const decorations = [];
 
-            decorations.push(mutedIcon);
+        liveBadge = new St.Label({
+            text: 'LIVE',
+            style_class: 'dvo-live-badge',
+            height: 16,
+            reactive: false,
+            can_focus: false,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        decorations.push(liveBadge);
+
+        if (!speakingOnly) {
+            if (statusIcons?.muted) {
+                mutedIcon =
+                    createStatusIcon(
+                        statusIcons.muted
+                    );
+
+                decorations.push(mutedIcon);
+            }
+
+            if (statusIcons?.deafened) {
+                deafenedIcon =
+                    createStatusIcon(
+                        statusIcons.deafened
+                    );
+
+                decorations.push(deafenedIcon);
+            }
         }
 
-        if (statusIcons?.deafened) {
-            deafenedIcon =
-                createStatusIcon(
-                    statusIcons.deafened
-                );
+        if (anchorRight) {
+            for (const decoration of decorations)
+                namePlate.add_child(decoration);
 
-            decorations.push(deafenedIcon);
+            namePlate.add_child(name);
+        } else {
+            namePlate.add_child(name);
+
+            for (const decoration of decorations)
+                namePlate.add_child(decoration);
         }
     }
 
-    // Keep the name beside the avatar in either orientation.
-    if (anchorRight) {
-        // The spacer aligns every avatar to the widest row's right edge.
-        row.add_child(
-            new St.Widget({
-                x_expand: true,
-                reactive: false,
-                can_focus: false,
-            })
-        );
+    if (anchorRight)
+        row.add_child(spacer);
 
-        for (const decoration of decorations)
-            namePlate.add_child(decoration);
+    const rowContent =
+        anchorRight
+            ? [namePlate, avatarContainer]
+            : [avatarContainer, namePlate];
 
-        namePlate.add_child(name);
-
-        row.add_child(namePlate);
-        row.add_child(avatarContainer);
-    } else {
-        namePlate.add_child(name);
-
-        for (const decoration of decorations)
-            namePlate.add_child(decoration);
-
-        row.add_child(avatarContainer);
-        row.add_child(namePlate);
-
-        row.add_child(
-            new St.Widget({
-                x_expand: true,
-                reactive: false,
-                can_focus: false,
-            })
-        );
+    for (const actor of rowContent) {
+        if (actor)
+            row.add_child(actor);
     }
+
+    if (!anchorRight)
+        row.add_child(spacer);
 
     let lastLive = null;
     let lastMuted = null;
     let lastDeafened = null;
-    let lastVisuallyActive = null;
+    let lastVisualOpacity = null;
+
+    const visualActors =
+        namePlate
+            ? [avatar, namePlate]
+            : [avatar];
 
     const update = (
         currentUser,
@@ -300,18 +307,20 @@ function createUserRow(
         const speaking =
             Boolean(currentUser.speaking);
 
-        const visuallyActive =
-            speaking || forceVisible;
-
         const visualOpacity =
-            userVisualOpacity(
-                visuallyActive
-            );
+            forceVisible
+                ? 255
+                : userVisualOpacity(
+                    speaking
+                );
 
         const live =
             Boolean(
-                currentUser.live
-                ?? currentUser.streaming
+                liveBadge
+                && (
+                    currentUser.live
+                    ?? currentUser.streaming
+                )
             );
 
         const muted =
@@ -345,25 +354,25 @@ function createUserRow(
             );
         }
 
-        if (lastVisuallyActive === null) {
-            row.opacity =
-                visualOpacity;
-        } else if (
-            visuallyActive
-            !== lastVisuallyActive
-        ) {
-            row.remove_all_transitions();
-            row.ease({
-                opacity: visualOpacity,
-                duration:
-                    USER_ACTIVITY_FADE_MS,
-                mode:
-                    Clutter.AnimationMode
-                        .EASE_OUT_QUAD,
-            });
+        if (lastVisualOpacity === null) {
+            for (const actor of visualActors)
+                actor.opacity = visualOpacity;
+        } else if (visualOpacity !== lastVisualOpacity) {
+            for (const actor of visualActors) {
+                actor.remove_all_transitions();
+                actor.ease({
+                    opacity: visualOpacity,
+                    duration:
+                        USER_ACTIVITY_FADE_MS,
+                    mode:
+                        Clutter.AnimationMode
+                            .EASE_OUT_QUAD,
+                });
+            }
         }
 
-        liveBadge.visible = live;
+        if (liveBadge)
+            liveBadge.visible = live;
 
         if (mutedIcon)
             mutedIcon.visible = muted;
@@ -374,8 +383,8 @@ function createUserRow(
         lastLive = live;
         lastMuted = muted;
         lastDeafened = deafened;
-        lastVisuallyActive =
-            visuallyActive;
+        lastVisualOpacity =
+            visualOpacity;
 
         return sizeChanged;
     };
@@ -435,6 +444,7 @@ export class UserListRenderer {
         overlayEnabled,
         editMode,
         speakingOnly,
+        showNames = true,
         ringInside,
         avatarSize,
         nameMaxWidth,
@@ -490,6 +500,7 @@ export class UserListRenderer {
                 monitorHeight:
                     monitor?.height,
                 overlayMargin,
+                showNames,
             }
         );
 
@@ -517,6 +528,7 @@ export class UserListRenderer {
                         ringInside,
                         nameMaxWidth,
                         anchorRight,
+                        showNames,
                     }
                 );
 
@@ -540,7 +552,8 @@ export class UserListRenderer {
                             nameMaxWidth,
                             anchorRight,
                             this._statusIcons,
-                            editMode
+                            editMode,
+                            showNames
                         ),
                 };
 
