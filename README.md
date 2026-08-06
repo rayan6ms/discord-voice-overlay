@@ -68,6 +68,7 @@ The default edit-mode shortcut is **Ctrl+,**. Press it while an allowed applicat
 
 - **Overlay** shows or hides the voice list.
 - **Speaking only** hides people who are not currently speaking.
+- **Names** hides names and status, leaving only avatars and speaking rings.
 - **Ring** moves the speaking ring inside or outside the avatar.
 - **Avatar**, **Name**, and **Users** adjust the layout.
 - Drag **Voice overlay** and **Controls** independently.

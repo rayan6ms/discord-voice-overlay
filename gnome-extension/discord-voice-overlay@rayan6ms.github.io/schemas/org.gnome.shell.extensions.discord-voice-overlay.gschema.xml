@@ -35,6 +35,11 @@
       <summary>Only display users who are currently speaking</summary>
     </key>
 
+    <key name="show-names" type="b">
+      <default>true</default>
+      <summary>Show names and status beside avatars</summary>
+    </key>
+
     <key name="ring-inside" type="b">
       <default>false</default>
       <summary>Draw the speaking ring inside the avatar</summary>
