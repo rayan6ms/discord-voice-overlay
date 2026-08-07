@@ -230,14 +230,24 @@ function createUserRow(
 
         const decorations = [];
 
-        liveBadge = new St.Label({
+        const liveLabel = new St.Label({
             text: 'LIVE',
+            style_class: 'dvo-live-label',
+            reactive: false,
+            can_focus: false,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        liveBadge = new St.Bin({
             style_class: 'dvo-live-badge',
             height: 16,
             reactive: false,
             can_focus: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
+
+        liveBadge.set_child(liveLabel);
 
         decorations.push(liveBadge);
 
