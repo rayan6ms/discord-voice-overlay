@@ -121,10 +121,13 @@
 .dvo-live-badge {
     padding: 0 6px;
     border-radius: 8px;
-    color: rgba(255, 255, 255, 0.98);
     background-color: #f23f42;
+}
+
+.dvo-live-label {
+    color: rgba(255, 255, 255, 0.98);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .dvo-status-icon {

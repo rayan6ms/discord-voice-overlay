@@ -2,6 +2,14 @@
 
 All notable public changes are documented here.
 
+## [1.0.11] - 2026-08-07
+
+GNOME extension metadata version: 30.
+
+### Fixed
+
+- Vertically center the LIVE text inside its badge and use a stronger weight that better matches Discord's rendering.
+
 ## [1.0.10] - 2026-08-06
 
 GNOME extension metadata version: 29.
@@ -226,3 +234,4 @@ Initial public release. GNOME extension metadata version: 19.
 [1.0.8]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.8
 [1.0.9]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.9
 [1.0.10]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.10
+[1.0.11]: https://github.com/rayan6ms/discord-voice-overlay/releases/tag/v1.0.11
