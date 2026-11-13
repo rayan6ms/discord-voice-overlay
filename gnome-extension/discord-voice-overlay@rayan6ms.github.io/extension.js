@@ -50,7 +50,7 @@ const UNDO_EDIT_KEYBINDING = 'undo-edit';
 const REDO_EDIT_KEYBINDING = 'redo-edit';
 const EDIT_HISTORY_LIMIT = 100;
 const DRAG_WATCHDOG_MS = 100;
-const EXTENSION_VERSION = 30;
+const EXTENSION_VERSION = 31;
 const APPLICATION_PICKER_PROTOCOL_VERSION = 2;
 
 const OVERLAY_POSITION_KEYS = new Set([
@@ -445,7 +445,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
     _buildUi() {
         this._root = new St.BoxLayout({
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
 
             reactive: false,
             can_focus: false,
@@ -470,7 +470,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._toolbar = new St.BoxLayout({
             style_class: 'dvo-toolbar',
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
             width: 196,
 
             reactive: true,
@@ -492,7 +492,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._dragHandle = new St.BoxLayout({
             style_class: 'dvo-drag-handle',
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
 
             reactive: true,
@@ -635,7 +635,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._avatarSizeBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
             reactive: true,
             can_focus: false,
@@ -693,7 +693,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._nameWidthBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
         });
 
@@ -751,7 +751,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._maxUsersBox = new St.BoxLayout({
             style_class: 'dvo-size-control',
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_expand: true,
         });
 
@@ -861,7 +861,7 @@ export default class DiscordVoiceOverlay extends Extension {
             style_class:
                 'dvo-drag-handle dvo-overlay-drag-handle',
 
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             x_align: Clutter.ActorAlign.CENTER,
             reactive: true,
             can_focus: false,
@@ -916,7 +916,7 @@ export default class DiscordVoiceOverlay extends Extension {
 
         this._userList = new St.BoxLayout({
             style_class: 'dvo-user-list',
-            vertical: true,
+            orientation: Clutter.Orientation.VERTICAL,
 
             reactive: false,
             can_focus: false,

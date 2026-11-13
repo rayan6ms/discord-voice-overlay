@@ -95,8 +95,8 @@ if metadata["uuid"] != extension_dir.name:
 if metadata["uuid"] != "discord-voice-overlay@rayan6ms.github.io":
     raise SystemExit("unexpected public extension UUID")
 
-if metadata["shell-version"] != ["50"]:
-    raise SystemExit("only the tested GNOME Shell 50 release may be declared")
+if metadata["shell-version"] != ["50", "51"]:
+    raise SystemExit("only the tested GNOME Shell 50 and 51 releases may be declared")
 
 version = int(metadata["version"])
 extension_match = re.search(r"const EXTENSION_VERSION = (\d+);", extension)

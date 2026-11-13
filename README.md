@@ -8,7 +8,7 @@ See who is speaking in your Discord voice channel without leaving your game. The
 
 ## Requirements
 
-- GNOME Shell **50** on Wayland
+- GNOME Shell **50 or 51** on Wayland
 - Discord Desktop for Linux (Snap is not supported by Vencord)
 - Node.js 22 or newer, with at least one of pnpm, Corepack, or npm
 - `gnome-extensions`, `curl`, `git`, `unzip`, and `sha256sum`
