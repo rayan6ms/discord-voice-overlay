@@ -107,7 +107,7 @@ function createUserRow(
 
     const row = new St.BoxLayout({
         style_class: 'dvo-user-row',
-        vertical: false,
+        orientation: Clutter.Orientation.HORIZONTAL,
         x_expand: true,
         x_align: Clutter.ActorAlign.FILL,
         reactive: false,
@@ -201,7 +201,7 @@ function createUserRow(
     if (showNames) {
         namePlate = new St.BoxLayout({
             style_class: 'dvo-name-plate',
-            vertical: false,
+            orientation: Clutter.Orientation.HORIZONTAL,
             reactive: false,
             can_focus: false,
             height: namePlateHeight,
@@ -731,7 +731,7 @@ export class UserListRenderer {
 
         this._overflowRow =
             new St.BoxLayout({
-                vertical: false,
+                orientation: Clutter.Orientation.HORIZONTAL,
                 x_expand: true,
                 x_align:
                     Clutter.ActorAlign.FILL,
